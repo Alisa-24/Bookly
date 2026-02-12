@@ -109,4 +109,119 @@ export const apiClient = {
 
     return response.json();
   },
+
+  async getBooks() {
+    const response = await fetch(`${API_BASE_URL}/books`, {
+      method: "GET",
+      headers: getHeaders(),
+    });
+
+    if (!response.ok) {
+      throw new Error("Failed to fetch books");
+    }
+
+    return response.json();
+  },
+
+  async getBookById(id: number) {
+    const response = await fetch(`${API_BASE_URL}/books/${id}`, {
+      method: "GET",
+      headers: getHeaders(),
+    });
+
+    if (!response.ok) {
+      throw new Error("Failed to fetch book");
+    }
+
+    return response.json();
+  },
+
+  async createBook(
+    title: string,
+    description: string,
+    stock: number,
+    price: number,
+    images: File[],
+  ) {
+    if (images.length < 1 || images.length > 4) {
+      throw new Error("You must upload between 1 and 4 images");
+    }
+
+    const formData = new FormData();
+    formData.append("title", title);
+    formData.append("description", description);
+    formData.append("stock", stock.toString());
+    formData.append("price", price.toString());
+    images.forEach((image) => {
+      formData.append("images", image);
+    });
+
+    const token = localStorage.getItem("auth_token");
+    const response = await fetch(`${API_BASE_URL}/books`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+      body: formData,
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.detail || "Failed to create book");
+    }
+
+    return response.json();
+  },
+
+  async updateBook(
+    id: number,
+    title: string,
+    description: string,
+    stock: number,
+    price: number,
+    images: File[],
+  ) {
+    if (images.length < 1 || images.length > 4) {
+      throw new Error("You must upload between 1 and 4 images");
+    }
+
+    const formData = new FormData();
+    formData.append("title", title);
+    formData.append("description", description);
+    formData.append("stock", stock.toString());
+    formData.append("price", price.toString());
+    images.forEach((image) => {
+      formData.append("images", image);
+    });
+
+    const token = localStorage.getItem("auth_token");
+    const response = await fetch(`${API_BASE_URL}/books/${id}`, {
+      method: "PUT",
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+      body: formData,
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.detail || "Failed to update book");
+    }
+
+    return response.json();
+  },
+
+  async deleteBook(id: number) {
+    const response = await fetch(`${API_BASE_URL}/books/${id}`, {
+      method: "DELETE",
+      headers: getHeaders(true),
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.detail || "Failed to delete book");
+    }
+
+    return response.json();
+  },
 };

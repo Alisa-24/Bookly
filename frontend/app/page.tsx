@@ -25,9 +25,9 @@ export default function Home() {
             <div className="flex flex-wrap items-center gap-4">
               <Link
                 className="inline-flex items-center gap-2 rounded-full bg-[var(--navy)] px-6 py-3 text-sm font-semibold text-[var(--white)] shadow-md transition-all hover:brightness-110"
-                href="/register"
+                href="/books"
               >
-                Start your library
+                Browse Books
                 <ArrowRight className="h-4 w-4" />
               </Link>
               <Link
