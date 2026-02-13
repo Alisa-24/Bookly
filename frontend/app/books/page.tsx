@@ -1,18 +1,11 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import {
-  BookOpen,
-  Search,
-  ShoppingCart,
-  User,
-  LogOut,
-  FilterX,
-  Star,
-} from "lucide-react";
+import { BookOpen, ShoppingCart, FilterX, Star } from "lucide-react";
 import Link from "next/link";
 import { apiClient } from "@/lib/api";
 import { cartApi } from "@/lib/api/cart";
+import SiteHeader from "@/components/SiteHeader";
 
 interface Book {
   id: number;
@@ -31,6 +24,7 @@ export default function BooksPage() {
   const [isAdmin, setIsAdmin] = useState(false);
   const [selectedGenre, setSelectedGenre] = useState<string | null>(null);
   const [minPrice, setMinPrice] = useState(0);
+  const [cartCount, setCartCount] = useState(0);
   const [toast, setToast] = useState<{
     message: string;
     type: "success" | "error";
@@ -42,6 +36,7 @@ export default function BooksPage() {
     setIsLoggedIn(!!token);
     if (token) {
       checkUserRole();
+      fetchCartCount();
     }
     fetchBooks();
   }, []);
@@ -87,6 +82,20 @@ export default function BooksPage() {
     }
   };
 
+  const fetchCartCount = async () => {
+    try {
+      const cart = await cartApi.getCart();
+      const count = cart.items.reduce(
+        (sum, item) => sum + item.quantity,
+        0,
+      );
+      setCartCount(count);
+    } catch (error) {
+      console.error("Failed to fetch cart count:", error);
+      setCartCount(0);
+    }
+  };
+
   const handleLogout = () => {
     localStorage.removeItem("auth_token");
     setIsLoggedIn(false);
@@ -104,12 +113,10 @@ export default function BooksPage() {
     book.title.toLowerCase().includes(searchQuery.toLowerCase()),
   );
 
-  // Get book cover URL - use first image or fallback to placeholder
   const getBookCoverUrl = (book: Book) => {
     if (book.images && book.images.length > 0) {
       return `http://localhost:8000${book.images[0]}`;
     }
-    // Fallback placeholder images
     const placeholders = [
       "https://images.unsplash.com/photo-1543002588-bfa74002ed7e?w=400&h=600&fit=crop",
       "https://images.unsplash.com/photo-1544947950-fa07a98d237f?w=400&h=600&fit=crop",
@@ -123,76 +130,14 @@ export default function BooksPage() {
 
   return (
     <div className="min-h-screen bg-[var(--off-white)] text-[var(--charcoal)]">
-      {/* Navigation Bar */}
-      <nav className="sticky top-0 z-50 bg-white/80 backdrop-blur-md border-b border-[var(--navy)]/10">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between h-20">
-            {/* Logo */}
-            <Link
-              href="/books"
-              className="flex-shrink-0 flex items-center gap-2"
-            >
-              <BookOpen className="h-8 w-8 text-[var(--navy)]" />
-              <span className="text-2xl font-bold tracking-tight text-[var(--navy)] font-serif italic">
-                Bookly
-              </span>
-            </Link>
-
-            {/* Search Bar */}
-            <div className="hidden md:flex flex-1 max-w-lg mx-8">
-              <div className="relative w-full">
-                <input
-                  className="w-full bg-[var(--beige)]/30 border-transparent focus:ring-2 focus:ring-[var(--navy)]/20 focus:border-[var(--navy)] rounded-full px-5 py-2.5 pl-12 text-sm"
-                  placeholder="Search by title..."
-                  type="text"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                />
-                <Search className="absolute left-4 top-2.5 h-5 w-5 text-[var(--charcoal)]/40" />
-              </div>
-            </div>
-
-            {/* Auth Buttons */}
-            <div className="flex items-center gap-4">
-              {isLoggedIn ? (
-                <>
-                  {isAdmin && (
-                    <Link
-                      href="/admin/books"
-                      className="text-sm text-[var(--navy)] hover:underline hidden sm:block"
-                    >
-                      Admin Panel
-                    </Link>
-                  )}
-                  <button
-                    onClick={handleLogout}
-                    className="flex items-center gap-2 bg-[var(--navy)]/10 text-[var(--navy)] px-4 py-2 rounded-full font-semibold hover:bg-[var(--navy)] hover:text-white transition-all"
-                  >
-                    <LogOut className="h-4 w-4" />
-                    <span className="text-sm">Logout</span>
-                  </button>
-                </>
-              ) : (
-                <Link
-                  href="/login"
-                  className="flex items-center gap-2 bg-[var(--navy)]/10 text-[var(--navy)] px-4 py-2 rounded-full font-semibold hover:bg-[var(--navy)] hover:text-white transition-all"
-                >
-                  <User className="h-4 w-4" />
-                  <span className="text-sm">Login</span>
-                </Link>
-              )}
-              <Link
-                href="/cart"
-                className="relative p-2 text-[var(--navy)] hover:bg-[var(--navy)]/10 rounded-full transition-colors"
-                aria-label="Shopping Cart"
-              >
-                <ShoppingCart className="h-6 w-6" />
-                {/* We could add a badge here if we had cart count in context */}
-              </Link>
-            </div>
-          </div>
-        </div>
-      </nav>
+      <SiteHeader
+        cartCount={cartCount}
+        isLoggedIn={isLoggedIn}
+        isAdmin={isAdmin}
+        onLogout={handleLogout}
+        searchQuery={searchQuery}
+        onSearchChange={setSearchQuery}
+      />
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Hero Section */}
@@ -414,6 +359,7 @@ export default function BooksPage() {
                             .addItem(book.id, 1)
                             .then(() => {
                               showToast("Added to cart!", "success");
+                              fetchCartCount();
                             })
                             .catch((err) => {
                               if (

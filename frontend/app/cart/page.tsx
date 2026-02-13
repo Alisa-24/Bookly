@@ -3,11 +3,16 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { cartApi, Cart } from "@/lib/api/cart";
+import { apiClient } from "@/lib/api";
 import { useRouter } from "next/navigation";
+import SiteHeader from "@/components/SiteHeader";
 
 export default function CartPage() {
   const [cart, setCart] = useState<Cart | null>(null);
   const [loading, setLoading] = useState(true);
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
   const router = useRouter();
 
   const buildImageSrc = (src: string) => {
@@ -24,46 +29,27 @@ export default function CartPage() {
       (sum, item) => sum + item.book.price * item.quantity,
       0,
     ) || 0;
-  const shipping = subtotal > 100 ? 0 : 5.0;
-  const tax = subtotal * 0.08; // 8% tax
-  const total = subtotal + shipping + tax;
+  const tax = subtotal * 0.1; // 10% tax
+  const total = subtotal + tax;
   const itemCount =
     cart?.items.reduce((sum, item) => sum + item.quantity, 0) || 0;
-
-  const recommendations = [
-    {
-      title: "Where the Crawdads Sing",
-      author: "Delia Owens",
-      price: 12.99,
-      image:
-        "https://lh3.googleusercontent.com/aida-public/AB6AXuAfbsa0MtuWtutgbz0xMiRQ5y_5k_dsHPtLYKXx6yJDODETRltjPrmt5bZeUHSqsiLwSg5vM7bH76EU5LjeOobkNMzp-k47EDD0Gn_91RfMdurk7zkDPtFgX_EfHOxI2qCuLGaS60242EKIy3-SmhCCUBohse8IG7jZ62CqCQUX9siQXRYosJ17PEjmq9-neZVCGbtWacVUvVlgIOzprozpWYpMJI73Lo-I-DTQNcMvf8NALjP1a39S20Drl6CLKR45DbTkmiC-4T1x",
-    },
-    {
-      title: "The Seven Husbands...",
-      author: "Taylor Jenkins Reid",
-      price: 15.99,
-      image:
-        "https://lh3.googleusercontent.com/aida-public/AB6AXuBNI4qxfA7rhCM3rdF7rtzsBcFss46BJF78Rt5GsnQjdluo-SvOgPz_naGQVBmi7vYh3uPzgtTHPEVfOiKIJNi6SUCqszD21HWH3_XyDyXtgmxMDesq347z47MV9s6eau_k0rJZXRdzK4uZPOpa9UD2umwL9qdDz2TEQ0YKUHqzsdFJLnxJoEaRi261nHwbxtwKjhwuEgcaCBRdmtx4RCMH5U2NcNOabjAuS-VqJP3AfHcdyVCECaDkqXwM6KcZoyHBbYSX2teSQkOY",
-    },
-    {
-      title: "Cloud Cuckoo Land",
-      author: "Anthony Doerr",
-      price: 21.0,
-      image:
-        "https://lh3.googleusercontent.com/aida-public/AB6AXuCmZFSbfzYtJ7nhT2YFCZ20FJNWw6eYpXGi0q8JdB0a5GEtrqfBo25B8NQCtelIsZY-yUHHxE8FyZ7hUfc8ULTUY7uZtCUl8j_tRnxbh0ruV9ot7fcj23WWYcNLlX0Oy4MsWkcbqV8kp_UyBbn4GKoSx8y8eUzLbHzaXSOO66wdVtEp_RnSxzUAzBcY75giXBlyr7EjEAXtv0fqK3uepfaktOzMfivWT8ezsrb_BMgz6bNZ5J4VEj-b6ElHA88NFOpdMInmXn9Nr8tC",
-    },
-    {
-      title: "Thinking, Fast and Slow",
-      author: "Daniel Kahneman",
-      price: 19.95,
-      image:
-        "https://lh3.googleusercontent.com/aida-public/AB6AXuBisfmkxtYST9dyOS2RSlGmcW1ZbGhpUHcfVHXAi4HQBrk8E_xsZoRSPcP_i5y6G4dxt1TMH-D1H24PBX6rkOvD7_QkZbAdUdzHdwH-gBjBJME5f-CRoc-Q6DVMWKu1FgW5zzJWgnjjYjzgMZyZwwX2o9hhlR34XSq5pCCcBCnIKqzN9nlM4PH9oNCajZbQiJj5IePJnKWOtEF_WH7OtCm2sU6AJvQErEeCo6DAOBafa44HvBI5A9xKkUlbXooSaRWsV56GD6EO2s-p",
-    },
-  ];
-
   useEffect(() => {
+    const token = localStorage.getItem("auth_token");
+    setIsLoggedIn(!!token);
+    if (token) {
+      checkUserRole();
+    }
     fetchCart();
   }, []);
+
+  const checkUserRole = async () => {
+    try {
+      const user = await apiClient.getCurrentUser();
+      setIsAdmin(user.role === "admin");
+    } catch (error) {
+      console.error("Failed to fetch user info:", error);
+    }
+  };
 
   const fetchCart = async () => {
     try {
@@ -113,6 +99,13 @@ export default function CartPage() {
     }
   };
 
+  const handleLogout = () => {
+    localStorage.removeItem("auth_token");
+    setIsLoggedIn(false);
+    setIsAdmin(false);
+    window.location.href = "/login";
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-[#f5f5f8]">
@@ -123,55 +116,20 @@ export default function CartPage() {
 
   return (
     <div className="bg-[#f5f5f8] min-h-screen text-slate-900">
-      <nav className="bg-white/90 backdrop-blur-md border-b border-[#0404ae]/10 px-6 py-4 sticky top-0 z-50">
-        <div className="max-w-7xl mx-auto flex justify-between items-center">
-          <Link href="/books" className="flex items-center gap-2">
-            <div className="w-8 h-8 bg-[#0404ae] rounded flex items-center justify-center">
-              <span className="material-icons text-white text-lg">
-                auto_stories
-              </span>
-            </div>
-            <span className="font-bold text-xl tracking-tight text-[#0404ae]">
-              Bookly
-            </span>
-          </Link>
-          <div className="flex items-center gap-6">
-            <Link
-              className="text-sm font-medium no-underline hover:underline hover:text-[#0404ae] transition-colors"
-              href="/books"
-            >
-              Browse
-            </Link>
-            <Link
-              className="text-sm font-medium no-underline hover:underline hover:text-[#0404ae] transition-colors"
-              href="/books"
-            >
-              Categories
-            </Link>
-            <div className="relative">
-              <span className="material-icons text-slate-600">
-                shopping_cart
-              </span>
-              {itemCount > 0 && (
-                <span className="absolute -top-2 -right-2 bg-[#0404ae] text-white text-[10px] font-bold w-4 h-4 rounded-full flex items-center justify-center">
-                  {itemCount}
-                </span>
-              )}
-            </div>
-            <div className="w-8 h-8 rounded-full bg-[#0404ae]/10 flex items-center justify-center">
-              <span className="material-icons text-[#0404ae] text-sm">
-                person
-              </span>
-            </div>
-          </div>
-        </div>
-      </nav>
+      <SiteHeader
+        cartCount={itemCount}
+        isLoggedIn={isLoggedIn}
+        isAdmin={isAdmin}
+        onLogout={handleLogout}
+        searchQuery={searchQuery}
+        onSearchChange={setSearchQuery}
+      />
 
       <main className="max-w-7xl mx-auto px-6 py-8">
         <div className="mb-8">
           <Link
             href="/books"
-            className="inline-flex items-center text-[#0404ae] font-medium no-underline hover:underline transition-all"
+            className="inline-flex items-center text-[#0404ae] font-medium no-underline hover:text-[#0404ae]/80 transition-all"
           >
             <span className="material-icons text-sm mr-2">arrow_back</span>
             Continue Shopping
@@ -280,7 +238,7 @@ export default function CartPage() {
                         </div>
                         <button
                           onClick={() => handleRemoveItem(item.id)}
-                          className="text-red-500 text-sm font-medium hover:underline flex items-center gap-1"
+                          className="text-red-500 text-sm font-medium hover:text-red-600 flex items-center gap-1"
                         >
                           <span className="material-icons text-xs">delete</span>
                           Remove
@@ -305,12 +263,6 @@ export default function CartPage() {
                       <span>Subtotal</span>
                       <span className="font-medium text-slate-900">
                         ${subtotal.toFixed(2)}
-                      </span>
-                    </div>
-                    <div className="flex justify-between text-slate-600">
-                      <span>Estimated Shipping</span>
-                      <span className="font-medium text-slate-900">
-                        ${shipping.toFixed(2)}
                       </span>
                     </div>
                     <div className="flex justify-between text-slate-600">
@@ -379,19 +331,19 @@ export default function CartPage() {
           </p>
           <div className="flex justify-center gap-6 mt-4">
             <Link
-              className="text-xs text-slate-400 no-underline hover:underline hover:text-[#0404ae]"
+              className="text-xs text-slate-400 no-underline hover:text-[#0404ae]"
               href="#"
             >
               Terms of Service
             </Link>
             <Link
-              className="text-xs text-slate-400 no-underline hover:underline hover:text-[#0404ae]"
+              className="text-xs text-slate-400 no-underline hover:text-[#0404ae]"
               href="#"
             >
               Privacy Policy
             </Link>
             <Link
-              className="text-xs text-slate-400 no-underline hover:underline hover:text-[#0404ae]"
+              className="text-xs text-slate-400 no-underline hover:text-[#0404ae]"
               href="#"
             >
               Help Center
