@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   BookOpen,
   Search,
@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { apiClient } from "@/lib/api";
+import { cartApi } from "@/lib/api/cart";
 
 interface Book {
   id: number;
@@ -30,6 +31,11 @@ export default function BooksPage() {
   const [isAdmin, setIsAdmin] = useState(false);
   const [selectedGenre, setSelectedGenre] = useState<string | null>(null);
   const [minPrice, setMinPrice] = useState(0);
+  const [toast, setToast] = useState<{
+    message: string;
+    type: "success" | "error";
+  } | null>(null);
+  const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     const token = localStorage.getItem("auth_token");
@@ -39,6 +45,27 @@ export default function BooksPage() {
     }
     fetchBooks();
   }, []);
+
+  useEffect(() => {
+    return () => {
+      if (toastTimerRef.current) {
+        clearTimeout(toastTimerRef.current);
+      }
+    };
+  }, []);
+
+  const showToast = (
+    message: string,
+    type: "success" | "error" = "success",
+  ) => {
+    setToast({ message, type });
+    if (toastTimerRef.current) {
+      clearTimeout(toastTimerRef.current);
+    }
+    toastTimerRef.current = setTimeout(() => {
+      setToast(null);
+    }, 2500);
+  };
 
   const checkUserRole = async () => {
     try {
@@ -154,6 +181,14 @@ export default function BooksPage() {
                   <span className="text-sm">Login</span>
                 </Link>
               )}
+              <Link
+                href="/cart"
+                className="relative p-2 text-[var(--navy)] hover:bg-[var(--navy)]/10 rounded-full transition-colors"
+                aria-label="Shopping Cart"
+              >
+                <ShoppingCart className="h-6 w-6" />
+                {/* We could add a badge here if we had cart count in context */}
+              </Link>
             </div>
           </div>
         </div>
@@ -367,6 +402,36 @@ export default function BooksPage() {
                           Stock: {book.stock}
                         </span>
                       </div>
+                      <button
+                        onClick={(e) => {
+                          e.preventDefault();
+                          // Simplified add to cart, could be improved with toast
+                          if (!isLoggedIn) {
+                            window.location.href = "/login";
+                            return;
+                          }
+                          cartApi
+                            .addItem(book.id, 1)
+                            .then(() => {
+                              showToast("Added to cart!", "success");
+                            })
+                            .catch((err) => {
+                              if (
+                                (err as { status?: number }).status === 401 ||
+                                (err as { status?: number }).status === 403
+                              ) {
+                                window.location.href = "/login";
+                                return;
+                              }
+                              console.error(err);
+                              showToast("Failed to add to cart", "error");
+                            });
+                        }}
+                        className="mt-3 w-full flex items-center justify-center gap-2 bg-[var(--navy)] text-white py-2 rounded-lg font-semibold hover:bg-[var(--navy)]/90 transition-colors"
+                      >
+                        <ShoppingCart className="h-4 w-4" />
+                        Add to Cart
+                      </button>
                     </div>
                   </Link>
                 ))}
@@ -440,6 +505,24 @@ export default function BooksPage() {
           </div>
         </div>
       </footer>
+
+      {toast && (
+        <div
+          className="fixed bottom-6 right-6 z-50"
+          role="status"
+          aria-live="polite"
+        >
+          <div
+            className={`rounded-full px-4 py-2 text-sm font-medium shadow-lg border ${
+              toast.type === "success"
+                ? "bg-emerald-50 text-emerald-800 border-emerald-200"
+                : "bg-rose-50 text-rose-800 border-rose-200"
+            }`}
+          >
+            {toast.message}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

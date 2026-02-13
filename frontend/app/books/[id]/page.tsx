@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import {
   BookOpen,
@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { apiClient } from "@/lib/api";
+import { cartApi } from "@/lib/api/cart";
 
 interface Book {
   id: number;
@@ -28,12 +29,38 @@ export default function BookDetailPage() {
   const [book, setBook] = useState<Book | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
+  const [toast, setToast] = useState<{
+    message: string;
+    type: "success" | "error";
+  } | null>(null);
+  const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     if (params.id) {
       fetchBook(Number(params.id));
     }
   }, [params.id]);
+
+  useEffect(() => {
+    return () => {
+      if (toastTimerRef.current) {
+        clearTimeout(toastTimerRef.current);
+      }
+    };
+  }, []);
+
+  const showToast = (
+    message: string,
+    type: "success" | "error" = "success",
+  ) => {
+    setToast({ message, type });
+    if (toastTimerRef.current) {
+      clearTimeout(toastTimerRef.current);
+    }
+    toastTimerRef.current = setTimeout(() => {
+      setToast(null);
+    }, 2500);
+  };
 
   const fetchBook = async (id: number) => {
     try {
@@ -110,6 +137,15 @@ export default function BookDetailPage() {
               <ArrowLeft className="h-5 w-5" />
               <span className="font-semibold">Back to Books</span>
             </Link>
+            <div className="flex items-center gap-4">
+              <Link
+                href="/cart"
+                className="relative p-2 text-[var(--navy)] hover:bg-[var(--navy)]/10 rounded-full transition-colors"
+                aria-label="Shopping Cart"
+              >
+                <ShoppingCart className="h-6 w-6" />
+              </Link>
+            </div>
           </div>
         </div>
       </nav>
@@ -236,6 +272,28 @@ export default function BookDetailPage() {
 
             <div className="space-y-4 pt-6">
               <button
+                onClick={async () => {
+                  // Check login (simplified, better to have auth context)
+                  const token = localStorage.getItem("auth_token");
+                  if (!token) {
+                    router.push("/login");
+                    return;
+                  }
+                  try {
+                    await cartApi.addItem(book.id, 1);
+                    showToast("Added to cart!", "success");
+                  } catch (err) {
+                    if (
+                      (err as { status?: number }).status === 401 ||
+                      (err as { status?: number }).status === 403
+                    ) {
+                      router.push("/login");
+                      return;
+                    }
+                    console.error(err);
+                    showToast("Failed to add to cart", "error");
+                  }
+                }}
                 disabled={book.stock === 0}
                 className="w-full bg-[var(--navy)] text-white py-4 px-6 rounded-lg font-semibold text-lg flex items-center justify-center gap-3 hover:bg-[var(--navy)]/90 transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-lg"
               >
@@ -256,6 +314,24 @@ export default function BookDetailPage() {
           </div>
         </div>
       </main>
+
+      {toast && (
+        <div
+          className="fixed bottom-6 right-6 z-50"
+          role="status"
+          aria-live="polite"
+        >
+          <div
+            className={`rounded-full px-4 py-2 text-sm font-medium shadow-lg border ${
+              toast.type === "success"
+                ? "bg-emerald-50 text-emerald-800 border-emerald-200"
+                : "bg-rose-50 text-rose-800 border-rose-200"
+            }`}
+          >
+            {toast.message}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

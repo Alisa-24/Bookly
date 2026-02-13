@@ -1,0 +1,34 @@
+from pydantic import BaseModel, ConfigDict
+from typing import List, Optional
+from datetime import datetime
+import uuid
+from app.schemas.book import BookRead
+
+class CartItemBase(BaseModel):
+    book_id: int
+    quantity: int = 1
+
+class CartItemCreate(CartItemBase):
+    pass
+
+class CartItemUpdate(BaseModel):
+    quantity: int
+
+class CartItemRead(CartItemBase):
+    id: int
+    cart_id: int
+    added_at: datetime
+    book: BookRead  # Nested book details
+
+    model_config = ConfigDict(from_attributes=True)
+
+class CartBase(BaseModel):
+    pass
+
+class CartRead(CartBase):
+    id: int
+    user_id: uuid.UUID
+    created_at: datetime
+    items: List[CartItemRead] = []
+
+    model_config = ConfigDict(from_attributes=True)

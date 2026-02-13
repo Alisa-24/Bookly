@@ -1,6 +1,6 @@
-const API_BASE_URL = "http://localhost:8000";
+export const API_BASE_URL = "http://localhost:8000";
 
-const getHeaders = (requireAuth = false) => {
+export const getHeaders = (requireAuth = false) => {
   const headers: HeadersInit = {
     "Content-Type": "application/json",
   };
