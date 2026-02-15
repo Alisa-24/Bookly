@@ -180,9 +180,11 @@ export const apiClient = {
     stock: number,
     price: number,
     images: File[],
+    keep_images: string[] = [],
   ) {
-    if (images.length < 1 || images.length > 4) {
-      throw new Error("You must upload between 1 and 4 images");
+    const totalImages = images.length + keep_images.length;
+    if (totalImages < 1 || totalImages > 4) {
+      throw new Error("Books must have between 1 and 4 images total");
     }
 
     const formData = new FormData();
@@ -190,6 +192,8 @@ export const apiClient = {
     formData.append("description", description);
     formData.append("stock", stock.toString());
     formData.append("price", price.toString());
+    formData.append("keep_images", JSON.stringify(keep_images));
+    
     images.forEach((image) => {
       formData.append("images", image);
     });

@@ -63,7 +63,7 @@ export default function CartPage() {
         (error as { status?: number }).status === 401 ||
         (error as { status?: number }).status === 403
       ) {
-        router.push("/login");
+        router.push("/books")
       }
     } finally {
       setLoading(false);

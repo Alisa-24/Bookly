@@ -26,7 +26,7 @@ export function GoogleSignInButton() {
             localStorage.setItem("auth_token", response.access_token);
             console.log("Google auth successful");
             // Redirect to dashboard
-            window.location.href = "/dashboard";
+            window.location.href = "/books";
           }
         } catch (err) {
           setError(

@@ -7,6 +7,7 @@ import { apiClient } from "@/lib/api";
 import { cartApi } from "@/lib/api/cart";
 import SiteHeader from "@/components/SiteHeader";
 import Footer from "@/components/Footer";
+import Toast from "@/components/Toast";
 
 interface Book {
   id: number;
@@ -40,6 +41,19 @@ export default function BooksPage() {
       fetchCartCount();
     }
     fetchBooks();
+
+    // Check for pending toasts from redirects
+    const pendingToast = localStorage.getItem("pending_toast");
+    if (pendingToast) {
+      try {
+        const { message, type } = JSON.parse(pendingToast);
+        showToast(message, type);
+      } catch (e) {
+        console.error("Failed to parse pending toast:", e);
+      } finally {
+        localStorage.removeItem("pending_toast");
+      }
+    }
   }, []);
 
   useEffect(() => {
@@ -348,9 +362,11 @@ export default function BooksPage() {
                       <button
                         onClick={(e) => {
                           e.preventDefault();
-                          // Simplified add to cart, could be improved with toast
                           if (!isLoggedIn) {
-                            window.location.href = "/login";
+                            showToast(
+                              "Please login to add items to your cart",
+                              "error",
+                            );
                             return;
                           }
                           cartApi
@@ -364,7 +380,12 @@ export default function BooksPage() {
                                 (err as { status?: number }).status === 401 ||
                                 (err as { status?: number }).status === 403
                               ) {
-                                window.location.href = "/login";
+                                showToast(
+                                  "Session expired. Please login again.",
+                                  "error",
+                                );
+                                localStorage.removeItem("auth_token");
+                                setIsLoggedIn(false);
                                 return;
                               }
                               console.error(err);
@@ -389,21 +410,11 @@ export default function BooksPage() {
       <Footer />
 
       {toast && (
-        <div
-          className="fixed bottom-6 right-6 z-50"
-          role="status"
-          aria-live="polite"
-        >
-          <div
-            className={`rounded-full px-4 py-2 text-sm font-medium shadow-lg border ${
-              toast.type === "success"
-                ? "bg-emerald-50 text-emerald-800 border-emerald-200"
-                : "bg-rose-50 text-rose-800 border-rose-200"
-            }`}
-          >
-            {toast.message}
-          </div>
-        </div>
+        <Toast
+          message={toast.message}
+          type={toast.type}
+          onClose={() => setToast(null)}
+        />
       )}
     </div>
   );

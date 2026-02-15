@@ -13,6 +13,7 @@ import {
 import Link from "next/link";
 import { apiClient } from "@/lib/api";
 import { cartApi } from "@/lib/api/cart";
+import Toast from "@/components/Toast";
 
 interface Book {
   id: number;
@@ -273,10 +274,10 @@ export default function BookDetailPage() {
             <div className="space-y-4 pt-6">
               <button
                 onClick={async () => {
-                  // Check login (simplified, better to have auth context)
+                  // Check login
                   const token = localStorage.getItem("auth_token");
                   if (!token) {
-                    router.push("/login");
+                    showToast("Please login to add items to your cart", "error");
                     return;
                   }
                   try {
@@ -287,7 +288,8 @@ export default function BookDetailPage() {
                       (err as { status?: number }).status === 401 ||
                       (err as { status?: number }).status === 403
                     ) {
-                      router.push("/login");
+                      showToast("Session expired. Please login again.", "error");
+                      localStorage.removeItem("auth_token");
                       return;
                     }
                     console.error(err);
@@ -316,21 +318,11 @@ export default function BookDetailPage() {
       </main>
 
       {toast && (
-        <div
-          className="fixed bottom-6 right-6 z-50"
-          role="status"
-          aria-live="polite"
-        >
-          <div
-            className={`rounded-full px-4 py-2 text-sm font-medium shadow-lg border ${
-              toast.type === "success"
-                ? "bg-emerald-50 text-emerald-800 border-emerald-200"
-                : "bg-rose-50 text-rose-800 border-rose-200"
-            }`}
-          >
-            {toast.message}
-          </div>
-        </div>
+        <Toast
+          message={toast.message}
+          type={toast.type}
+          onClose={() => setToast(null)}
+        />
       )}
     </div>
   );

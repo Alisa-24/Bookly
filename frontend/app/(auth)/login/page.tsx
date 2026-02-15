@@ -3,14 +3,35 @@
 import Link from "next/link";
 import { LoginForm } from "@/components/auth/login-form";
 import { GoogleSignInButton } from "@/components/auth/google-sign-in-button";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
+import Toast from "@/components/Toast";
 
 export default function LoginPage() {
+  const [toast, setToast] = useState<{
+    message: string;
+    type: "success" | "error";
+  } | null>(null);
+
   useEffect(() => {
     // Redirect to dashboard if user is already logged in
     const token = localStorage.getItem("auth_token");
     if (token) {
       window.location.href = "/books";
+      return;
+    }
+
+    // Check for pending toasts
+    const pendingToast = localStorage.getItem("pending_toast");
+    if (pendingToast) {
+      try {
+        const { message, type } = JSON.parse(pendingToast);
+        setToast({ message, type });
+        setTimeout(() => setToast(null), 3000);
+      } catch (e) {
+        console.error("Failed to parse pending toast:", e);
+      } finally {
+        localStorage.removeItem("pending_toast");
+      }
     }
   }, []);
 
@@ -45,6 +66,13 @@ export default function LoginPage() {
           Join Bookly today
         </Link>
       </div>
+      {toast && (
+        <Toast
+          message={toast.message}
+          type={toast.type}
+          onClose={() => setToast(null)}
+        />
+      )}
     </section>
   );
 }

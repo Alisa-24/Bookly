@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import SiteHeader from "@/components/SiteHeader";
 import { paymentAPI } from "@/lib/api/payment";
+import { cartApi } from "@/lib/api/cart";
 import { apiClient } from "@/lib/api";
 import Footer from "@/components/Footer";
 
@@ -31,6 +32,7 @@ function DashboardContent() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [paymentSuccess, setPaymentSuccess] = useState(false);
+  const [cartCount, setCartCount] = useState(0);
 
   useEffect(() => {
     const token = localStorage.getItem("auth_token");
@@ -38,6 +40,7 @@ function DashboardContent() {
     if (token) {
       checkUserRole();
       fetchOrders();
+      fetchCartCount();
     } else {
       router.push("/login");
     }
@@ -52,16 +55,33 @@ function DashboardContent() {
     }
   };
 
+  const fetchCartCount = async () => {
+    try {
+      const cart = await cartApi.getCart();
+      const count = cart.items.reduce((sum, item) => sum + item.quantity, 0);
+      setCartCount(count);
+    } catch (error) {
+      console.error("Failed to fetch cart count:", error);
+    }
+  };
+
   const fetchOrders = async () => {
     try {
       setLoading(true);
+
+      // If coming from Stripe callback, verify session first
+      if (sessionId) {
+        try {
+          await paymentAPI.verifySession(sessionId);
+          setPaymentSuccess(true);
+          fetchCartCount(); // Refresh cart count after verification
+        } catch (vErr) {
+          console.error("Session verification failed:", vErr);
+        }
+      }
+
       const data = await paymentAPI.getOrders();
       setOrders(data);
-
-      // If coming from Stripe callback, mark as success
-      if (sessionId) {
-        setPaymentSuccess(true);
-      }
     } catch (error) {
       console.error("Failed to fetch orders:", error);
       setError("Failed to load orders");
@@ -114,7 +134,7 @@ function DashboardContent() {
   return (
     <div className="flex flex-col min-h-screen bg-[var(--off-white)] text-[var(--charcoal)]">
       <SiteHeader
-        cartCount={0}
+        cartCount={cartCount}
         isLoggedIn={isLoggedIn}
         isAdmin={isAdmin}
         onLogout={handleLogout}

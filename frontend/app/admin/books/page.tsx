@@ -3,9 +3,12 @@
 import { useEffect, useState } from "react";
 import { BookOpen, LogOut, Plus, Edit, Trash2 } from "lucide-react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { apiClient } from "@/lib/api";
 import Modal from "@/components/Modal";
 import ConfirmModal from "@/components/ConfirmModal";
+import SiteHeader from "@/components/SiteHeader";
+import Toast from "@/components/Toast";
 
 interface Book {
   id: number;
@@ -17,6 +20,7 @@ interface Book {
 }
 
 export default function AdminBooksPage() {
+  const router = useRouter();
   const [books, setBooks] = useState<Book[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
@@ -27,13 +31,29 @@ export default function AdminBooksPage() {
     stock: 1,
     price: 0,
   });
-  const [selectedImages, setSelectedImages] = useState<File[]>([]);
-  const [imagePreviews, setImagePreviews] = useState<string[]>([]);
+  const [selectedImages, setSelectedImages] = useState<{
+    file?: File;
+    url: string;
+    isExisting: boolean;
+  }[]>([]);
   const [isCheckingAuth, setIsCheckingAuth] = useState(true);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [cartCount, setCartCount] = useState(0);
   const [deleteConfirm, setDeleteConfirm] = useState<{
     show: boolean;
     bookId: number | null;
   }>({ show: false, bookId: null });
+  const [toast, setToast] = useState<{
+    message: string;
+    type: "success" | "error";
+  } | null>(null);
+
+  const showToast = (message: string, type: "success" | "error" = "success") => {
+    setToast({ message, type });
+    setTimeout(() => setToast(null), 3000);
+  };
 
   useEffect(() => {
     checkAdminAccess();
@@ -43,7 +63,11 @@ export default function AdminBooksPage() {
     // Check if user is logged in
     const token = localStorage.getItem("auth_token");
     if (!token) {
-      window.location.href = "/login";
+      localStorage.setItem(
+        "pending_toast",
+        JSON.stringify({ message: "Access denied. Please login.", type: "error" }),
+      );
+      router.push("/login");
       return;
     }
 
@@ -51,15 +75,45 @@ export default function AdminBooksPage() {
     try {
       const user = await apiClient.getCurrentUser();
       if (user.role !== "admin") {
-        alert("Access denied. Admin privileges required.");
-        window.location.href = "/books";
+        localStorage.setItem(
+          "pending_toast",
+          JSON.stringify({
+            message: "Access denied. Admin privileges required.",
+            type: "error",
+          }),
+        );
+        router.push("/books");
         return;
       }
+      setIsLoggedIn(true);
+      setIsAdmin(true);
       setIsCheckingAuth(false);
       fetchBooks();
+      fetchCartCount();
     } catch (error) {
       console.error("Failed to verify admin access:", error);
-      window.location.href = "/login";
+      localStorage.setItem(
+        "pending_toast",
+        JSON.stringify({
+          message: "Access denied. Session expired.",
+          type: "error",
+        }),
+      );
+      router.push("/books");
+      return;
+    }
+  };
+
+  const fetchCartCount = async () => {
+    try {
+      // Import cartApi dynamically if needed or use a shared state/context
+      // For now, let's assume we can import it or it's available
+      const { cartApi } = await import("@/lib/api/cart");
+      const cart = await cartApi.getCart();
+      const count = cart.items.reduce((sum, item) => sum + item.quantity, 0);
+      setCartCount(count);
+    } catch (error) {
+      console.error("Failed to fetch cart count:", error);
     }
   };
 
@@ -82,11 +136,21 @@ export default function AdminBooksPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    // Validate images count (1-4)
     if (selectedImages.length < 1 || selectedImages.length > 4) {
-      alert("Please select between 1 and 4 images");
+      alert("Please provide between 1 and 4 images");
       return;
     }
+
+    const newFiles = selectedImages
+      .filter(img => !img.isExisting && img.file)
+      .map(img => img.file as File);
+    
+    const keep_images = selectedImages
+      .filter(img => img.isExisting)
+      .map(img => {
+        const url = new URL(img.url);
+        return url.pathname;
+      });
 
     try {
       if (editingBook) {
@@ -96,7 +160,8 @@ export default function AdminBooksPage() {
           formData.description,
           formData.stock,
           formData.price,
-          selectedImages,
+          newFiles,
+          keep_images
         );
       } else {
         await apiClient.createBook(
@@ -104,14 +169,10 @@ export default function AdminBooksPage() {
           formData.description,
           formData.stock,
           formData.price,
-          selectedImages,
+          newFiles,
         );
       }
-      setFormData({ title: "", description: "", stock: 1, price: 0 });
-      setSelectedImages([]);
-      setImagePreviews([]);
-      setShowForm(false);
-      setEditingBook(null);
+      handleCancel();
       fetchBooks();
     } catch (error: any) {
       alert(error.message || "Operation failed");
@@ -120,29 +181,31 @@ export default function AdminBooksPage() {
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
-
-    if (files.length < 1 || files.length > 4) {
-      alert("Please select between 1 and 4 images");
+    
+    if (selectedImages.length + files.length > 4) {
+      alert("Maximum 4 images allowed total");
       e.target.value = "";
       return;
     }
 
-    setSelectedImages(files);
+    const newImages = files.map(file => ({
+      file,
+      url: URL.createObjectURL(file),
+      isExisting: false
+    }));
 
-    // Create previews for all selected files
-    const previews: string[] = [];
-    let loadedCount = 0;
+    setSelectedImages(prev => [...prev, ...newImages]);
+    e.target.value = ""; // Clear input for next selection
+  };
 
-    files.forEach((file) => {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        previews.push(reader.result as string);
-        loadedCount++;
-        if (loadedCount === files.length) {
-          setImagePreviews(previews);
-        }
-      };
-      reader.readAsDataURL(file);
+  const removeImage = (index: number) => {
+    setSelectedImages(prev => {
+      const newImages = [...prev];
+      if (!newImages[index].isExisting) {
+        URL.revokeObjectURL(newImages[index].url);
+      }
+      newImages.splice(index, 1);
+      return newImages;
     });
   };
 
@@ -154,11 +217,14 @@ export default function AdminBooksPage() {
       stock: book.stock,
       price: book.price,
     });
-    setSelectedImages([]);
+    
     if (book.images && book.images.length > 0) {
-      setImagePreviews(book.images.map((img) => `http://localhost:8000${img}`));
+      setSelectedImages(book.images.map(img => ({
+        url: img.startsWith('http') ? img : `http://localhost:8000${img}`,
+        isExisting: true
+      })));
     } else {
-      setImagePreviews([]);
+      setSelectedImages([]);
     }
     setShowForm(true);
   };
@@ -182,9 +248,16 @@ export default function AdminBooksPage() {
     setShowForm(false);
     setEditingBook(null);
     setFormData({ title: "", description: "", stock: 1, price: 0 });
+    // Revoke blob URLs to prevent memory leaks
+    selectedImages.forEach(img => {
+      if (!img.isExisting) URL.revokeObjectURL(img.url);
+    });
     setSelectedImages([]);
-    setImagePreviews([]);
   };
+
+  const filteredBooks = books.filter((book) =>
+    book.title.toLowerCase().includes(searchQuery.toLowerCase()),
+  );
 
   if (isCheckingAuth) {
     return (
@@ -200,29 +273,13 @@ export default function AdminBooksPage() {
   return (
     <div className="min-h-screen bg-[var(--off-white)]">
       {/* Header */}
-      <header className="bg-[var(--navy)] text-[var(--off-white)] shadow-sm">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 flex justify-between items-center">
-          <div className="flex items-center gap-2">
-            <BookOpen className="h-8 w-8" />
-            <h1 className="text-3xl font-bold font-serif">Bookly Admin</h1>
-          </div>
-          <div className="flex items-center gap-4">
-            <Link
-              href="/books"
-              className="px-4 py-2 rounded-lg bg-[var(--beige)] text-[var(--navy)] font-semibold hover:bg-[var(--off-white)] transition-colors"
-            >
-              View Store
-            </Link>
-            <button
-              onClick={handleLogout}
-              className="flex items-center gap-2 px-4 py-2 rounded-lg bg-[var(--off-white)] text-[var(--navy)] font-semibold hover:bg-[var(--beige)] transition-colors"
-            >
-              <LogOut className="h-4 w-4" />
-              Logout
-            </button>
-          </div>
-        </div>
-      </header>
+      <SiteHeader
+        cartCount={cartCount}
+        isLoggedIn={isLoggedIn}
+        isAdmin={isAdmin}
+        onLogout={handleLogout}
+        searchQuery={searchQuery}
+        onSearchChange={setSearchQuery} />
 
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
@@ -288,7 +345,7 @@ export default function AdminBooksPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-[var(--slate-200)]">
-                {books.map((book) => (
+                {filteredBooks.map((book) => (
                   <tr key={book.id} className="hover:bg-[var(--beige)]/10">
                     <td className="px-6 py-4 text-sm text-[var(--charcoal)]">
                       {book.id}
@@ -351,127 +408,178 @@ export default function AdminBooksPage() {
         )}
       </main>
 
-      {/* Add/Edit Book Modal */}
       <Modal
         isOpen={showForm}
         onClose={handleCancel}
-        title={editingBook ? "Edit Book" : "Add New Book"}
+        title={editingBook ? "Edit Book Details" : "Add New Book to Collection"}
         maxWidth="2xl"
       >
-        <form onSubmit={handleSubmit} className="space-y-6">
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-semibold text-[var(--charcoal)] mb-2">
-                Title
-              </label>
-              <input
-                type="text"
-                required
-                value={formData.title}
-                onChange={(e) =>
-                  setFormData({ ...formData, title: e.target.value })
-                }
-                className="w-full px-4 py-2 border border-[var(--slate-200)] rounded-lg focus:ring-2 focus:ring-[var(--navy)] focus:border-transparent"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-semibold text-[var(--charcoal)] mb-2">
-                Price
-              </label>
-              <input
-                type="number"
-                required
-                min="0"
-                step="0.01"
-                value={formData.price}
-                onChange={(e) =>
-                  setFormData({
-                    ...formData,
-                    price: parseFloat(e.target.value),
-                  })
-                }
-                className="w-full px-4 py-2 border border-[var(--slate-200)] rounded-lg focus:ring-2 focus:ring-[var(--navy)] focus:border-transparent"
-              />
-            </div>
-          </div>
-          <div>
-            <label className="block text-sm font-semibold text-[var(--charcoal)] mb-2">
-              Description
-            </label>
-            <textarea
-              required
-              rows={4}
-              value={formData.description}
-              onChange={(e) =>
-                setFormData({ ...formData, description: e.target.value })
-              }
-              className="w-full px-4 py-2 border border-[var(--slate-200)] rounded-lg focus:ring-2 focus:ring-[var(--navy)] focus:border-transparent"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-semibold text-[var(--charcoal)] mb-2">
-              Stock
-            </label>
-            <input
-              type="number"
-              required
-              min="0"
-              value={formData.stock}
-              onChange={(e) =>
-                setFormData({
-                  ...formData,
-                  stock: parseInt(e.target.value),
-                })
-              }
-              className="w-full px-4 py-2 border border-[var(--slate-200)] rounded-lg focus:ring-2 focus:ring-[var(--navy)] focus:border-transparent"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-semibold text-[var(--charcoal)] mb-2">
-              Book Cover Images (1-4 required){" "}
-              <span className="text-red-500">*</span>
-            </label>
-            <input
-              type="file"
-              accept="image/*"
-              multiple
-              required={selectedImages.length === 0}
-              onChange={handleImageChange}
-              className="w-full px-4 py-2 border border-[var(--slate-200)] rounded-lg focus:ring-2 focus:ring-[var(--navy)] focus:border-transparent"
-            />
-            <p className="text-xs text-[var(--charcoal)]/60 mt-1">
-              Select 1-4 images. Hold Ctrl/Cmd to select multiple files.
-            </p>
-            {imagePreviews.length > 0 && (
-              <div className="mt-4 grid grid-cols-2 md:grid-cols-4 gap-4">
-                {imagePreviews.map((preview, index) => (
-                  <div key={index} className="relative">
-                    <img
-                      src={preview}
-                      alt={`Preview ${index + 1}`}
-                      className="w-full h-48 object-cover rounded-lg border border-[var(--slate-200)]"
+        <form onSubmit={handleSubmit} className="p-2">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            {/* Left Column: Details */}
+            <div className="space-y-6">
+              <div className="space-y-4">
+                <h4 className="text-xs font-bold uppercase tracking-widest text-[var(--navy)]/50 pb-2 border-b border-[var(--navy)]/10">
+                  Book Information
+                </h4>
+                <div>
+                  <label className="block text-sm font-semibold text-[var(--charcoal)] mb-1.5">
+                    Title
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="Enter book title"
+                    value={formData.title}
+                    onChange={(e) =>
+                      setFormData({ ...formData, title: e.target.value })
+                    }
+                    className="w-full px-4 py-2.5 bg-[var(--beige)]/20 border border-[var(--slate-200)] rounded-xl focus:ring-2 focus:ring-[var(--navy)]/20 focus:border-[var(--navy)] outline-none transition-all font-medium"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-semibold text-[var(--charcoal)] mb-1.5">
+                    Description
+                  </label>
+                  <textarea
+                    required
+                    rows={5}
+                    placeholder="Provide a detailed description of the book..."
+                    value={formData.description}
+                    onChange={(e) =>
+                      setFormData({ ...formData, description: e.target.value })
+                    }
+                    className="w-full px-4 py-2.5 bg-[var(--beige)]/20 border border-[var(--slate-200)] rounded-xl focus:ring-2 focus:ring-[var(--navy)]/20 focus:border-[var(--navy)] outline-none transition-all font-medium resize-none text-sm leading-relaxed"
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-semibold text-[var(--charcoal)] mb-1.5">
+                      Price ($)
+                    </label>
+                    <input
+                      type="number"
+                      required
+                      min="0"
+                      step="0.01"
+                      value={formData.price}
+                      onChange={(e) =>
+                        setFormData({
+                          ...formData,
+                          price: parseFloat(e.target.value),
+                        })
+                      }
+                      className="w-full px-4 py-2.5 bg-[var(--beige)]/20 border border-[var(--slate-200)] rounded-xl focus:ring-2 focus:ring-[var(--navy)]/20 focus:border-[var(--navy)] outline-none transition-all font-semibold"
                     />
-                    <span className="absolute top-2 left-2 bg-[var(--navy)] text-white px-2 py-1 rounded text-xs">
-                      {index + 1}
-                    </span>
                   </div>
-                ))}
+                  <div>
+                    <label className="block text-sm font-semibold text-[var(--charcoal)] mb-1.5">
+                      Inventory (Stock)
+                    </label>
+                    <input
+                      type="number"
+                      required
+                      min="0"
+                      value={formData.stock}
+                      onChange={(e) =>
+                        setFormData({
+                          ...formData,
+                          stock: parseInt(e.target.value),
+                        })
+                      }
+                      className="w-full px-4 py-2.5 bg-[var(--beige)]/20 border border-[var(--slate-200)] rounded-xl focus:ring-2 focus:ring-[var(--navy)]/20 focus:border-[var(--navy)] outline-none transition-all font-semibold"
+                    />
+                  </div>
+                </div>
               </div>
-            )}
+            </div>
+
+            {/* Right Column: Images */}
+            <div className="space-y-6">
+              <div className="space-y-4">
+                <div className="flex items-center justify-between pb-2 border-b border-[var(--navy)]/10">
+                  <h4 className="text-xs font-bold uppercase tracking-widest text-[var(--navy)]/50">
+                    Book Covers ({selectedImages.length}/4)
+                  </h4>
+                  <span className="text-[10px] text-red-500 font-bold uppercase">
+                    Required: 1-4
+                  </span>
+                </div>
+                
+                <div className="grid grid-cols-2 gap-3">
+                  {selectedImages.map((img, index) => (
+                    <div key={index} className="group relative aspect-[3/4] bg-[var(--beige)]/10 rounded-xl overflow-hidden border border-[var(--slate-200)] shadow-sm">
+                      <img
+                        src={img.url}
+                        alt={`Preview ${index + 1}`}
+                        className="w-full h-full object-cover"
+                      />
+                      <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                        <button
+                          type="button"
+                          onClick={() => removeImage(index)}
+                          className="p-2 bg-red-500 text-white rounded-full hover:scale-110 transition-transform shadow-lg"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      </div>
+                      <div className="absolute top-2 left-2 flex gap-1">
+                        <span className="px-2 py-0.5 bg-white/90 text-[var(--navy)] text-[8px] font-black uppercase rounded shadow-sm">
+                          {img.isExisting ? 'Existing' : 'New'}
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                  
+                  {selectedImages.length < 4 && (
+                    <label className="cursor-pointer group relative aspect-[3/4] border-2 border-dashed border-[var(--slate-200)] hover:border-[var(--navy)]/30 rounded-xl flex flex-col items-center justify-center gap-2 bg-[var(--beige)]/5 hover:bg-[var(--navy)]/5 transition-all">
+                      <div className="p-3 bg-white rounded-full shadow-sm text-[var(--navy)]/50 group-hover:text-[var(--navy)] transition-colors">
+                        <Plus className="h-6 w-6" />
+                      </div>
+                      <span className="text-xs font-bold text-[var(--navy)]/40 group-hover:text-[var(--navy)]/60">
+                        Add Image
+                      </span>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        multiple
+                        onChange={handleImageChange}
+                        className="hidden"
+                      />
+                    </label>
+                  )}
+                </div>
+                
+                <p className="text-[10px] text-[var(--charcoal)]/50 italic leading-relaxed">
+                  Tip: Drag and drop not supported yet. Select high-quality portrait images for best results.
+                </p>
+              </div>
+            </div>
           </div>
-          <div className="flex gap-4 pt-4 border-t border-[var(--slate-200)]">
+
+          <div className="mt-8 pt-6 border-t border-[var(--slate-200)] flex gap-4">
             <button
-              type="submit"
-              className="flex-1 px-6 py-3 bg-[var(--navy)] text-white rounded-lg font-semibold hover:opacity-90 transition-opacity"
-            >
-              {editingBook ? "Update Book" : "Add Book"}
-            </button>
-            <button
-              type="button"
               onClick={handleCancel}
-              className="flex-1 px-6 py-3 bg-[var(--slate-200)] text-[var(--charcoal)] rounded-lg font-semibold hover:bg-[var(--slate-300)] transition-colors"
+              type="button"
+              className="px-8 py-3 bg-[var(--off-white)] text-[var(--charcoal)]/70 rounded-xl font-bold hover:bg-[var(--slate-100)] hover:text-[var(--charcoal)] transition-all flex-1"
             >
               Cancel
+            </button>
+            <button
+              type="submit"
+              className="px-8 py-3 bg-[var(--navy)] text-white rounded-xl font-bold hover:brightness-110 hover:shadow-lg transition-all flex-[2] flex items-center justify-center gap-2"
+            >
+              {editingBook ? (
+                <>
+                  <Edit className="h-4 w-4" />
+                  Update Book Details
+                </>
+              ) : (
+                <>
+                  <Plus className="h-4 w-4" />
+                  Add Book to Catalog
+                </>
+              )}
             </button>
           </div>
         </form>
@@ -488,6 +596,13 @@ export default function AdminBooksPage() {
         cancelText="Cancel"
         type="danger"
       />
+      {toast && (
+        <Toast
+          message={toast.message}
+          type={toast.type}
+          onClose={() => setToast(null)}
+        />
+      )}
     </div>
   );
 }

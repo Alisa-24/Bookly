@@ -23,10 +23,18 @@ export function LoginForm() {
       const response = await apiClient.login(email, password);
       if (response.access_token) {
         localStorage.setItem("auth_token", response.access_token);
+        
+        // Fetch user info to get role
+        const user = await apiClient.getCurrentUser();
+        
         setSuccess("Login successful!");
         // Redirect to dashboard
         setTimeout(() => {
-          window.location.href = "/dashboard";
+          if (user.role === "admin") {
+            window.location.href = "/admin/books";
+          } else {
+            window.location.href = "/books";
+          }
         }, 500);
       } else {
         setError("No access token received");

@@ -23,6 +23,43 @@ from app.core.stripe import stripe
 
 router = APIRouter()
 
+async def process_successful_payment(order: Order, session: AsyncSession):
+    """Decrease stock and clear cart after payment"""
+    if order and order.status != "completed":
+        # Get cart with items
+        cart_query = select(Cart).where(
+            Cart.id == order.cart_id
+        ).options(
+            selectinload(Cart.items).selectinload(CartItem.book)
+        )
+        cart_result = await session.execute(cart_query)
+        cart = cart_result.scalar_one_or_none()
+        
+        if cart and cart.items:
+            # Decrease stock for each item
+            for item in cart.items:
+                if item.book:
+                    # Ensure stock doesn't go negative
+                    new_stock = max(0, item.book.stock - item.quantity)
+                    item.book.stock = new_stock
+                    
+                    if new_stock == 0:
+                        # User requested to delete book if stock is 0
+                        await session.delete(item.book)
+                    else:
+                        session.add(item.book)
+            
+            # Delete all items from cart
+            for item in list(cart.items):
+                await session.delete(item)
+        
+        # Update order status
+        order.status = "completed"
+        session.add(order)
+        await session.commit()
+        return True
+    return False
+
 def get_cart_total(cart_items: list) -> tuple[float, list]:
     """Calculate cart total and return (total, items_data)"""
     total = 0.0
@@ -196,6 +233,45 @@ async def create_payment_intent(
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Payment error: {str(e)}")
 
+@router.post("/verify-session", tags=["payments"])
+async def verify_session(
+    request: dict,
+    user: User = Depends(current_active_user),
+    session: AsyncSession = Depends(get_async_session),
+):
+    """
+    Verify a Stripe checkout session and complete the order.
+    Fallback for when webhooks are not available (e.g. local dev).
+    """
+    session_id = request.get("session_id")
+    if not session_id:
+        raise HTTPException(status_code=400, detail="session_id is required")
+
+    try:
+        # Retrieve the session from Stripe
+        checkout_session = stripe.checkout.Session.retrieve(session_id)
+        
+        if checkout_session.payment_status == "paid":
+            # Get order by session ID
+            order_query = select(Order).where(
+                (Order.stripe_session_id == session_id) & (Order.user_id == user.id)
+            )
+            order_result = await session.execute(order_query)
+            order = order_result.scalar_one_or_none()
+            
+            if order:
+                updated = await process_successful_payment(order, session)
+                return {"status": "success", "updated": updated}
+            else:
+                raise HTTPException(status_code=404, detail="Order not found")
+        else:
+            return {"status": "pending", "payment_status": checkout_session.payment_status}
+            
+    except stripe.error.StripeError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
 @router.get("/orders", response_model=list[OrderRead], tags=["orders"])
 async def get_user_orders(
     user: User = Depends(current_active_user),
@@ -250,36 +326,6 @@ async def stripe_webhook(
     except stripe.error.SignatureVerificationError as e:
         raise HTTPException(status_code=400, detail="Invalid signature")
     
-    # Helper function to process successful payment
-    async def process_successful_payment(order: Order):
-        """Decrease stock and clear cart after payment"""
-        if order:
-            # Get cart with items
-            cart_query = select(Cart).where(
-                Cart.id == order.cart_id
-            ).options(
-                selectinload(Cart.items).selectinload(CartItem.book)
-            )
-            cart_result = await session.execute(cart_query)
-            cart = cart_result.scalar_one_or_none()
-            
-            if cart and cart.items:
-                # Decrease stock for each item
-                for item in cart.items:
-                    if item.book:
-                        # Ensure stock doesn't go negative
-                        item.book.stock = max(0, item.book.stock - item.quantity)
-                        session.add(item.book)
-                
-                # Delete all items from cart
-                for item in list(cart.items):  # Create a copy of list to avoid issues while deleting
-                    session.delete(item)
-            
-            # Update order status
-            order.status = "completed"
-            session.add(order)
-            await session.commit()
-    
     # Handle different event types
     if event["type"] == "payment_intent.succeeded":
         payment_intent = event["data"]["object"]
@@ -291,7 +337,7 @@ async def stripe_webhook(
         order_result = await session.execute(order_query)
         order = order_result.scalar_one_or_none()
         
-        await process_successful_payment(order)
+        await process_successful_payment(order, session)
     
     elif event["type"] == "checkout.session.completed":
         checkout_session = event["data"]["object"]
@@ -303,7 +349,7 @@ async def stripe_webhook(
         order_result = await session.execute(order_query)
         order = order_result.scalar_one_or_none()
         
-        await process_successful_payment(order)
+        await process_successful_payment(order, session)
     
     elif event["type"] == "charge.refunded":
         charge = event["data"]["object"]

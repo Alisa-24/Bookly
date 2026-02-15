@@ -75,4 +75,20 @@ export const paymentAPI = {
 
     return response.json();
   },
+
+  // Verify Stripe session (fallback for webhooks)
+  async verifySession(sessionId: string) {
+    const response = await fetch(`${API_BASE_URL}/payments/verify-session`, {
+      method: "POST",
+      headers: getHeaders(),
+      body: JSON.stringify({ session_id: sessionId }),
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.detail || "Failed to verify session");
+    }
+
+    return response.json();
+  },
 };
