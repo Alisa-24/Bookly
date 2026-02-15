@@ -16,6 +16,7 @@ interface Book {
   stock: number;
   price: number;
   images: string[];
+  average_rating: number;
 }
 
 export default function BooksPage() {
@@ -339,16 +340,29 @@ export default function BooksPage() {
                       {book.description}
                     </p>
                     <div className="flex items-center gap-1 mb-3">
-                      <div className="flex text-yellow-400">
-                        <Star className="h-4 w-4 fill-current" />
-                        <Star className="h-4 w-4 fill-current" />
-                        <Star className="h-4 w-4 fill-current" />
-                        <Star className="h-4 w-4 fill-current" />
-                        <Star className="h-4 w-4" />
-                      </div>
-                      <span className="text-[10px] text-[var(--charcoal)]/40 font-bold">
-                        (4.0)
-                      </span>
+                      {book.average_rating > 0 ? (
+                        <>
+                          <div className="flex text-yellow-400">
+                            {[1, 2, 3, 4, 5].map((star) => (
+                              <Star
+                                key={star}
+                                className={`h-4 w-4 ${
+                                  star <= Math.round(book.average_rating || 0)
+                                    ? "fill-current"
+                                    : "text-gray-300"
+                                }`}
+                              />
+                            ))}
+                          </div>
+                          <span className="text-[10px] text-[var(--charcoal)]/40 font-bold">
+                            ({(book.average_rating || 0).toFixed(1)})
+                          </span>
+                        </>
+                      ) : (
+                        <span className="text-[10px] px-2 py-0.5 bg-green-100 text-green-700 rounded-full font-bold uppercase tracking-wider">
+                          New
+                        </span>
+                      )}
                     </div>
                     <div className="mt-auto">
                       <div className="flex items-center justify-between mb-2">

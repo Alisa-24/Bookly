@@ -1,5 +1,6 @@
 from fastapi import APIRouter, HTTPException, Depends, UploadFile, File, Form
 from sqlalchemy import select
+from sqlalchemy.orm import selectinload
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.models.book import Book
 from app.schemas.book import BookRead
@@ -16,13 +17,14 @@ router = APIRouter()
 
 @router.get("", response_model=list[BookRead])
 async def list_books(session: AsyncSession = Depends(get_async_session)):
-    result = await session.execute(select(Book))
+    result = await session.execute(select(Book).options(selectinload(Book.reviews)))
     books = result.scalars().all()
     return books
 
 @router.get("/{book_id}", response_model=BookRead)
 async def get_book(book_id: int, session: AsyncSession = Depends(get_async_session)):
-    result = await session.execute(select(Book).where(Book.id == book_id))
+    query = select(Book).where(Book.id == book_id).options(selectinload(Book.reviews))
+    result = await session.execute(query)
     book = result.scalar_one_or_none()
     if not book:
         raise HTTPException(status_code=404, detail="Book not found")

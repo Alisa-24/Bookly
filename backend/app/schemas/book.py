@@ -1,5 +1,6 @@
 from pydantic import BaseModel, ConfigDict
-from typing import List
+from typing import List, Optional
+from app.schemas.review import ReviewRead
 
 class BookRead(BaseModel):
     id: int
@@ -8,6 +9,8 @@ class BookRead(BaseModel):
     stock: int
     price: float
     images: List[str] = []
+    reviews: List[ReviewRead] = []
+    average_rating: Optional[float] = 0.0
     model_config = ConfigDict(from_attributes=True)
 
 class BookCreate(BaseModel):
