@@ -1,16 +1,27 @@
 # Bookly
 
-A modern book management system with a beautiful storefront and admin panel with integrated Stripe payments.
+**Bookly** in a premium, full-stack e-commerce application for book enthusiasts. Built with a modern tech stack, it offers a seamless shopping experience from browsing beautifully curated collections to secure checkout and real-time community engagement.
 
-## Features
+## Visual Tour
 
-- **User Authentication**: Google OAuth and email/password authentication
-- **Book Management**: Browse, search, and filter books
-- **Shopping Cart**: Add books to cart, manage quantities
-- **Stripe Payments**: Secure checkout with Stripe integration
-- **Order History**: Track all purchases and order status
-- **Admin Panel**: Manage books, upload images, view orders
-- **Responsive Design**: Works on desktop and mobile devices
+![Storefront Preview](books_page.png)
+*The elegant storefront featuring curated collections and real-time search.*
+
+![Book Details & Reviews](review.png)
+*Detailed book pages with dynamic inventory tracking and community reviews.*
+
+![Admin Dashboard](admin_page.png)
+*A powerful admin panel for managing inventory, orders, and library content.*
+
+## Key Features
+
+- **Modern Shopping Experience**: Fast, responsive, and visually stunning UI built with Next.js and Tailwind CSS.
+- **Book Review System**: Real-time star ratings and community comments for every book in the library.
+- **Dynamic Inventory**: Automatic stock management that updates in real-time after every successful purchase.
+- **Secure Payments**: Fully integrated Stripe checkout with webhook support for reliable order processing.
+- **Advanced Filtering**: Smart filtering by price, genre, and search queries to help users find their next read.
+- **Robust Admin Panel**: Complete control over book listings, image uploads, and order management.
+- **Secure Authentication**: Choice between secure email/password or seamless Google OAuth login.
 
 ## Default Admin Credentials
 
