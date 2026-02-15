@@ -1,7 +1,18 @@
+"use client";
+
 import Link from "next/link";
 import { ArrowRight, BookOpen, Library, Sparkles, Users } from "lucide-react";
+import { useEffect } from "react";
 
 export default function Home() {
+  useEffect(() => {
+    // Redirect to dashboard if user is already logged in
+    const token = localStorage.getItem("auth_token");
+    if (token) {
+      window.location.href = "/dashboard";
+    }
+  }, []);
+
   return (
     <main className="min-h-screen bg-[var(--off-white)] text-[var(--charcoal)]">
       <section className="relative overflow-hidden px-6 pb-20 pt-16 sm:px-10 lg:px-16">

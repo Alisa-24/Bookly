@@ -9,6 +9,7 @@ from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from app.models.cart import Cart
+    from app.models.orders import Order
 
 class User(SQLAlchemyBaseUserTableUUID, Base):
     full_name: Mapped[Optional[str]] = mapped_column(String, nullable=True)
@@ -17,3 +18,4 @@ class User(SQLAlchemyBaseUserTableUUID, Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     
     cart: Mapped["Cart"] = relationship("Cart", back_populates="user", uselist=False, cascade="all, delete-orphan")
+    orders: Mapped[list["Order"]] = relationship("Order", back_populates="user", cascade="all, delete-orphan")

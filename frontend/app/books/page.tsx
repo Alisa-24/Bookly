@@ -6,6 +6,7 @@ import Link from "next/link";
 import { apiClient } from "@/lib/api";
 import { cartApi } from "@/lib/api/cart";
 import SiteHeader from "@/components/SiteHeader";
+import Footer from "@/components/Footer";
 
 interface Book {
   id: number;
@@ -85,10 +86,7 @@ export default function BooksPage() {
   const fetchCartCount = async () => {
     try {
       const cart = await cartApi.getCart();
-      const count = cart.items.reduce(
-        (sum, item) => sum + item.quantity,
-        0,
-      );
+      const count = cart.items.reduce((sum, item) => sum + item.quantity, 0);
       setCartCount(count);
     } catch (error) {
       console.error("Failed to fetch cart count:", error);
@@ -142,20 +140,20 @@ export default function BooksPage() {
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Hero Section */}
         <section className="relative rounded-xl overflow-hidden mb-12 bg-[var(--navy)]/5 border border-[var(--navy)]/10">
-          <div className="flex flex-col md:flex-row items-center">
-            <div className="w-full md:w-1/2 p-8 md:p-12 lg:p-16">
-              <span className="inline-block px-3 py-1 bg-[var(--navy)] text-white text-xs font-bold rounded-full mb-6 tracking-widest uppercase">
+          <div className="flex flex-col md:flex-row items-stretch">
+            <div className="w-full md:w-1/2 p-6 md:p-8 lg:p-12 flex flex-col justify-center">
+              <span className="inline-block px-3 py-1 bg-[var(--navy)] text-white text-xs font-bold rounded-full mb-4 tracking-widest uppercase w-fit">
                 Featured Collection
               </span>
-              <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold mb-4 leading-tight font-serif">
+              <h1 className="text-3xl md:text-4xl lg:text-5xl font-bold mb-3 leading-tight font-serif">
                 Discover Your Next Favorite Book
               </h1>
-              <p className="text-[var(--charcoal)]/70 text-lg mb-8 max-w-md italic">
+              <p className="text-[var(--charcoal)]/70 text-base md:text-lg mb-6 max-w-md italic">
                 Explore our curated collection of timeless classics and modern
                 masterpieces.
               </p>
             </div>
-            <div className="w-full md:w-1/2 relative min-h-[400px]">
+            <div className="w-full md:w-1/2 relative h-64 md:h-auto md:min-h-[350px]">
               <img
                 src="https://lh3.googleusercontent.com/aida-public/AB6AXuDX36MyuKgCQviiGElt-h9E5vz_Xn9D6xtlrpqClJhZMHHTVCFTuOSpxhIYO2g-JT6Uj9fa0xIRqMpBV9wV9ZfuGDfkWD6g4lJRtfxBRLPAhO6u-qVUr93UvrOGOCOw0PCloMh2H2nb-vX4BfLrkMHSO-I_WgjUM4Kg7E3Um0cyR7rZXBAvC2uP91xiko7DKqaOHaqfzbyyib5h5MWcvTbtM9ZL2vofpoOcZ4bbVE2TpVF_1D5S8OAKmMlwUY5TprYLpW39fNXLCEbh"
                 alt="The Midnight Library Book Cover"
@@ -388,69 +386,7 @@ export default function BooksPage() {
       </main>
 
       {/* Footer */}
-      <footer className="mt-24 border-t border-[var(--slate-200)] bg-white py-12">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-12">
-            <div className="col-span-1 md:col-span-2">
-              <div className="flex items-center gap-2 mb-6">
-                <BookOpen className="h-8 w-8 text-[var(--navy)]" />
-                <span className="text-2xl font-bold tracking-tight text-[var(--navy)] font-serif italic">
-                  Bookly
-                </span>
-              </div>
-              <p className="text-[var(--charcoal)]/60 max-w-sm mb-8 italic">
-                Your gateway to thousands of worlds, curated for the modern
-                reader who values both style and substance.
-              </p>
-            </div>
-            <div>
-              <h4 className="font-bold mb-6">Company</h4>
-              <ul className="space-y-4 text-[var(--charcoal)]/60 text-sm">
-                <li>
-                  <a
-                    className="hover:text-[var(--navy)] transition-colors"
-                    href="#"
-                  >
-                    About Us
-                  </a>
-                </li>
-                <li>
-                  <a
-                    className="hover:text-[var(--navy)] transition-colors"
-                    href="#"
-                  >
-                    Contact
-                  </a>
-                </li>
-              </ul>
-            </div>
-            <div>
-              <h4 className="font-bold mb-6">Support</h4>
-              <ul className="space-y-4 text-[var(--charcoal)]/60 text-sm">
-                <li>
-                  <a
-                    className="hover:text-[var(--navy)] transition-colors"
-                    href="#"
-                  >
-                    Privacy Policy
-                  </a>
-                </li>
-                <li>
-                  <a
-                    className="hover:text-[var(--navy)] transition-colors"
-                    href="#"
-                  >
-                    Terms of Service
-                  </a>
-                </li>
-              </ul>
-            </div>
-          </div>
-          <div className="mt-12 pt-8 border-t border-[var(--slate-100)] text-center text-[var(--charcoal)]/40 text-xs">
-            © 2026 Bookly. Designed for literary lovers.
-          </div>
-        </div>
-      </footer>
+      <Footer />
 
       {toast && (
         <div

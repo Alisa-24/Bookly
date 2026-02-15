@@ -10,7 +10,7 @@ export default function LoginPage() {
     // Redirect to dashboard if user is already logged in
     const token = localStorage.getItem("auth_token");
     if (token) {
-      window.location.href = "/dashboard";
+      window.location.href = "/books";
     }
   }, []);
 

@@ -23,6 +23,7 @@ import os
 import shutil
 from pathlib import Path
 from app.api.cart import router as cart_router
+from app.api.payment import router as payment_router
 
 class GoogleCallbackRequest(BaseModel):
     code: str
@@ -73,6 +74,12 @@ api_router.include_router(
     cart_router,
     prefix="/cart",
     tags=["cart"],
+)
+
+api_router.include_router(
+    payment_router,
+    prefix="/payments",
+    tags=["payments"],
 )
 
 @api_router.post("/auth/google/callback", response_model=TokenResponse, tags=["auth"])

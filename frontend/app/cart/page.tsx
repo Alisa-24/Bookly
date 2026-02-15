@@ -6,6 +6,8 @@ import { cartApi, Cart } from "@/lib/api/cart";
 import { apiClient } from "@/lib/api";
 import { useRouter } from "next/navigation";
 import SiteHeader from "@/components/SiteHeader";
+import CheckoutButton from "@/components/CheckoutButton";
+import Footer from "@/components/Footer";
 
 export default function CartPage() {
   const [cart, setCart] = useState<Cart | null>(null);
@@ -108,14 +110,14 @@ export default function CartPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-[#f5f5f8]">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-[#0404ae]"></div>
+      <div className="min-h-screen flex items-center justify-center bg-[var(--off-white)]">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-[var(--navy)]"></div>
       </div>
     );
   }
 
   return (
-    <div className="bg-[#f5f5f8] min-h-screen text-slate-900">
+    <div className="flex flex-col min-h-screen bg-[var(--off-white)] text-[var(--charcoal)]">
       <SiteHeader
         cartCount={itemCount}
         isLoggedIn={isLoggedIn}
@@ -124,12 +126,11 @@ export default function CartPage() {
         searchQuery={searchQuery}
         onSearchChange={setSearchQuery}
       />
-
-      <main className="max-w-7xl mx-auto px-6 py-8">
+      <main className="flex-1 max-w-7xl mx-auto w-full px-6 py-8">
         <div className="mb-8">
           <Link
             href="/books"
-            className="inline-flex items-center text-[#0404ae] font-medium no-underline hover:text-[#0404ae]/80 transition-all"
+            className="inline-flex items-center text-[var(--navy)] font-medium no-underline hover:text-[var(--navy)]/80 transition-all"
           >
             <span className="material-icons text-sm mr-2">arrow_back</span>
             Continue Shopping
@@ -139,27 +140,29 @@ export default function CartPage() {
         <div className="flex flex-col lg:flex-row gap-8">
           <div className="lg:w-[70%]">
             <div className="flex justify-between items-end mb-6">
-              <h1 className="text-3xl font-bold">Your Shopping Cart</h1>
-              <span className="text-slate-500 font-medium">
+              <h1 className="text-3xl font-bold font-serif">
+                Your Shopping Cart
+              </h1>
+              <span className="text-[var(--charcoal)]/60 font-medium">
                 {itemCount} items in your bag
               </span>
             </div>
 
             <div className="space-y-1">
               {cart?.items.length === 0 ? (
-                <div className="text-center py-12 bg-white rounded-xl border border-slate-100">
-                  <span className="material-icons text-6xl text-slate-300 mb-4">
-                    shopping_cat
+                <div className="text-center py-12 bg-white rounded-xl border border-[var(--navy)]/10">
+                  <span className="material-icons text-6xl text-[var(--charcoal)]/20 mb-4">
+                    shopping_bag
                   </span>
-                  <h2 className="text-xl font-semibold mb-2">
+                  <h2 className="text-xl font-semibold mb-2 font-serif">
                     Your cart is empty
                   </h2>
-                  <p className="text-slate-500 mb-6">
+                  <p className="text-[var(--charcoal)]/60 mb-6">
                     Looks like you haven't added any books yet.
                   </p>
                   <Link
                     href="/books"
-                    className="px-6 py-2 bg-[#0404ae] text-white rounded-lg hover:bg-[#0404ae]/90 transition-colors"
+                    className="px-6 py-2 bg-[var(--navy)] text-white rounded-lg hover:bg-[var(--navy)]/90 transition-colors"
                   >
                     Start Shopping
                   </Link>
@@ -168,9 +171,9 @@ export default function CartPage() {
                 cart?.items.map((item) => (
                   <div
                     key={item.id}
-                    className="bg-white p-6 rounded-xl shadow-sm border border-slate-100 flex gap-6 items-start transition-all hover:shadow-md"
+                    className="bg-white p-6 rounded-xl shadow-sm border border-[var(--navy)]/10 flex gap-6 items-start transition-all hover:shadow-md"
                   >
-                    <div className="w-24 h-36 bg-slate-100 rounded overflow-hidden flex-shrink-0">
+                    <div className="w-24 h-36 bg-[var(--beige)]/30 rounded overflow-hidden flex-shrink-0">
                       {item.book.images?.[0] ? (
                         <img
                           src={buildImageSrc(item.book.images[0])}
@@ -179,7 +182,7 @@ export default function CartPage() {
                           loading="lazy"
                         />
                       ) : (
-                        <div className="w-full h-full flex items-center justify-center bg-slate-200 text-slate-400">
+                        <div className="w-full h-full flex items-center justify-center bg-[var(--beige)]/50 text-[var(--charcoal)]/40">
                           <span className="material-icons">menu_book</span>
                         </div>
                       )}
@@ -188,30 +191,30 @@ export default function CartPage() {
                       <div className="flex justify-between gap-4">
                         <div className="min-w-0">
                           <Link href={`/books/${item.book.id}`}>
-                            <h3 className="text-lg font-bold hover:text-[#0404ae] cursor-pointer transition-colors block leading-tight mb-1">
+                            <h3 className="text-lg font-bold hover:text-[var(--navy)] cursor-pointer transition-colors block leading-tight mb-1 font-serif">
                               {item.book.title}
                             </h3>
                           </Link>
-                          <p className="text-slate-500 text-sm line-clamp-2">
+                          <p className="text-[var(--charcoal)]/60 text-sm line-clamp-2">
                             {item.book.description}
                           </p>
-                          <p className="text-xs text-slate-400 mt-1 uppercase tracking-wider">
+                          <p className="text-xs text-[var(--charcoal)]/40 mt-1 uppercase tracking-wider">
                             In stock
                           </p>
                         </div>
                         <div className="text-right">
-                          <span className="text-xl font-bold text-slate-900 dark:text-white">
+                          <span className="text-xl font-bold text-[var(--charcoal)]">
                             ${item.book.price.toFixed(2)}
                           </span>
                         </div>
                       </div>
                       <div className="flex justify-between items-end">
-                        <div className="flex items-center bg-slate-50 rounded-lg border border-slate-200 p-1">
+                        <div className="flex items-center bg-[var(--beige)]/30 rounded-lg border border-[var(--navy)]/10 p-1">
                           <button
                             onClick={() =>
                               handleUpdateQuantity(item.id, item.quantity - 1)
                             }
-                            className="w-8 h-8 flex items-center justify-center text-[#0404ae] hover:bg-white rounded transition-colors disabled:opacity-50"
+                            className="w-8 h-8 flex items-center justify-center text-[var(--navy)] hover:bg-white rounded transition-colors disabled:opacity-50"
                             disabled={item.quantity <= 1}
                           >
                             <span className="material-icons text-sm">
@@ -225,7 +228,7 @@ export default function CartPage() {
                             onClick={() =>
                               handleUpdateQuantity(item.id, item.quantity + 1)
                             }
-                            className="w-8 h-8 flex items-center justify-center text-[#0404ae] hover:bg-white rounded transition-colors"
+                            className="w-8 h-8 flex items-center justify-center text-[var(--navy)] hover:bg-white rounded transition-colors"
                             disabled={item.quantity >= item.book.stock}
                             title={
                               item.quantity >= item.book.stock
@@ -253,67 +256,66 @@ export default function CartPage() {
 
           {cart?.items && cart.items.length > 0 && (
             <div className="lg:w-[30%]">
-              <div className="sticky top-24 bg-white rounded-xl shadow-lg border border-[#0404ae]/10 overflow-hidden">
+              <div className="sticky top-24 bg-white rounded-xl shadow-lg border border-[var(--navy)]/10 overflow-hidden">
                 <div className="p-6">
-                  <h2 className="text-xl font-bold mb-6 text-slate-900">
+                  <h2 className="text-xl font-bold mb-6 text-[var(--charcoal)] font-serif">
                     Order Summary
                   </h2>
                   <div className="space-y-4 mb-6">
-                    <div className="flex justify-between text-slate-600">
+                    <div className="flex justify-between text-[var(--charcoal)]/60">
                       <span>Subtotal</span>
-                      <span className="font-medium text-slate-900">
+                      <span className="font-medium text-[var(--charcoal)]">
                         ${subtotal.toFixed(2)}
                       </span>
                     </div>
-                    <div className="flex justify-between text-slate-600">
+                    <div className="flex justify-between text-[var(--charcoal)]/60">
                       <span>Estimated Tax</span>
-                      <span className="font-medium text-slate-900">
+                      <span className="font-medium text-[var(--charcoal)]">
                         ${tax.toFixed(2)}
                       </span>
                     </div>
-                    <div className="pt-4 border-t border-slate-100">
+                    <div className="pt-4 border-t border-[var(--navy)]/10">
                       <div className="flex justify-between items-center">
                         <span className="text-lg font-bold">Order Total</span>
-                        <span className="text-2xl font-bold text-[#0404ae]">
+                        <span className="text-2xl font-bold text-[var(--navy)]">
                           ${total.toFixed(2)}
                         </span>
                       </div>
                     </div>
                   </div>
-                  <button className="w-full bg-[#0404ae] hover:bg-[#0404ae]/90 text-white font-bold py-4 rounded-lg transition-all flex items-center justify-center gap-2 mb-4 group">
-                    Proceed to Checkout
-                    <span className="material-icons text-sm group-hover:translate-x-1 transition-transform">
-                      arrow_forward
-                    </span>
-                  </button>
+                  <CheckoutButton
+                    cartId={cart?.id || 0}
+                    total={total}
+                    disabled={!isLoggedIn || cart?.items.length === 0}
+                  />
                   <div className="mt-6 flex flex-col gap-3">
-                    <div className="flex items-center gap-3 p-3 bg-slate-50 rounded-lg">
-                      <span className="material-icons text-slate-400">
+                    <div className="flex items-center gap-3 p-3 bg-[var(--beige)]/30 rounded-lg">
+                      <span className="material-icons text-[var(--charcoal)]/40">
                         local_shipping
                       </span>
-                      <span className="text-xs text-slate-600">
+                      <span className="text-xs text-[var(--charcoal)]/60">
                         Free shipping on orders over $100
                       </span>
                     </div>
-                    <div className="flex items-center gap-3 p-3 bg-slate-50 rounded-lg">
-                      <span className="material-icons text-slate-400">
+                    <div className="flex items-center gap-3 p-3 bg-[var(--beige)]/30 rounded-lg">
+                      <span className="material-icons text-[var(--charcoal)]/40">
                         security
                       </span>
-                      <span className="text-xs text-slate-600">
+                      <span className="text-xs text-[var(--charcoal)]/60">
                         Secure encrypted checkout
                       </span>
                     </div>
                   </div>
                 </div>
-                <div className="bg-[#0404ae]/5 p-4 border-t border-[#0404ae]/10">
+                <div className="bg-[var(--navy)]/5 p-4 border-t border-[var(--navy)]/10">
                   <div className="flex items-center justify-center gap-4">
-                    <span className="material-icons text-slate-400 text-lg">
+                    <span className="material-icons text-[var(--charcoal)]/40 text-lg">
                       payments
                     </span>
-                    <span className="material-icons text-slate-400 text-lg">
+                    <span className="material-icons text-[var(--charcoal)]/40 text-lg">
                       credit_card
                     </span>
-                    <span className="material-icons text-slate-400 text-lg">
+                    <span className="material-icons text-[var(--charcoal)]/40 text-lg">
                       account_balance_wallet
                     </span>
                   </div>
@@ -323,34 +325,7 @@ export default function CartPage() {
           )}
         </div>
       </main>
-
-      <footer className="mt-20 py-12 bg-white border-t border-slate-200">
-        <div className="max-w-7xl mx-auto px-6 text-center">
-          <p className="text-slate-500 text-sm">
-            © 2026 Bookly. All rights reserved.
-          </p>
-          <div className="flex justify-center gap-6 mt-4">
-            <Link
-              className="text-xs text-slate-400 no-underline hover:text-[#0404ae]"
-              href="#"
-            >
-              Terms of Service
-            </Link>
-            <Link
-              className="text-xs text-slate-400 no-underline hover:text-[#0404ae]"
-              href="#"
-            >
-              Privacy Policy
-            </Link>
-            <Link
-              className="text-xs text-slate-400 no-underline hover:text-[#0404ae]"
-              href="#"
-            >
-              Help Center
-            </Link>
-          </div>
-        </div>
-      </footer>
+      <Footer />
     </div>
   );
 }
