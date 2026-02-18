@@ -2,7 +2,17 @@ from pydantic import BaseModel, ConfigDict
 from typing import List, Optional
 from datetime import datetime
 import uuid
-from app.schemas.book import BookRead
+
+class CartItemBookRead(BaseModel):
+    """Simplified book schema for cart items (without reviews)"""
+    id: int
+    title: str
+    description: str
+    stock: int
+    price: float
+    images: List[str] = []
+
+    model_config = ConfigDict(from_attributes=True)
 
 class CartItemBase(BaseModel):
     book_id: int
@@ -18,7 +28,7 @@ class CartItemRead(CartItemBase):
     id: int
     cart_id: int
     added_at: datetime
-    book: BookRead  # Nested book details
+    book: CartItemBookRead  # Use simplified book schema
 
     model_config = ConfigDict(from_attributes=True)
 

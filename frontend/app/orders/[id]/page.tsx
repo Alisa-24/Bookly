@@ -5,7 +5,7 @@ import { useRouter, useParams } from "next/navigation";
 import Link from "next/link";
 import SiteHeader from "@/components/SiteHeader";
 import { paymentAPI } from "@/lib/api/payment";
-import { apiClient } from "@/lib/api";
+import { apiClient, clearAuthTokens, getAccessToken } from "@/lib/api";
 import Footer from "@/components/Footer";
 
 interface Order {
@@ -32,7 +32,7 @@ export default function OrderDetailsPage() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    const token = localStorage.getItem("auth_token");
+    const token = getAccessToken();
     setIsLoggedIn(!!token);
     if (token) {
       checkUserRole();
@@ -65,7 +65,7 @@ export default function OrderDetailsPage() {
   };
 
   const handleLogout = () => {
-    localStorage.removeItem("auth_token");
+    clearAuthTokens();
     setIsLoggedIn(false);
     setIsAdmin(false);
     window.location.href = "/login";

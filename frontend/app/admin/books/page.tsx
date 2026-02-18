@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { BookOpen, LogOut, Plus, Edit, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { apiClient } from "@/lib/api";
+import { apiClient, clearAuthTokens, getAccessToken } from "@/lib/api";
 import Modal from "@/components/Modal";
 import ConfirmModal from "@/components/ConfirmModal";
 import SiteHeader from "@/components/SiteHeader";
@@ -31,11 +31,13 @@ export default function AdminBooksPage() {
     stock: 1,
     price: 0,
   });
-  const [selectedImages, setSelectedImages] = useState<{
-    file?: File;
-    url: string;
-    isExisting: boolean;
-  }[]>([]);
+  const [selectedImages, setSelectedImages] = useState<
+    {
+      file?: File;
+      url: string;
+      isExisting: boolean;
+    }[]
+  >([]);
   const [isCheckingAuth, setIsCheckingAuth] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [isLoggedIn, setIsLoggedIn] = useState(false);
@@ -50,7 +52,10 @@ export default function AdminBooksPage() {
     type: "success" | "error";
   } | null>(null);
 
-  const showToast = (message: string, type: "success" | "error" = "success") => {
+  const showToast = (
+    message: string,
+    type: "success" | "error" = "success",
+  ) => {
     setToast({ message, type });
     setTimeout(() => setToast(null), 3000);
   };
@@ -61,11 +66,14 @@ export default function AdminBooksPage() {
 
   const checkAdminAccess = async () => {
     // Check if user is logged in
-    const token = localStorage.getItem("auth_token");
+    const token = getAccessToken();
     if (!token) {
       localStorage.setItem(
         "pending_toast",
-        JSON.stringify({ message: "Access denied. Please login.", type: "error" }),
+        JSON.stringify({
+          message: "Access denied. Please login.",
+          type: "error",
+        }),
       );
       router.push("/login");
       return;
@@ -129,7 +137,7 @@ export default function AdminBooksPage() {
   };
 
   const handleLogout = () => {
-    localStorage.removeItem("auth_token");
+    clearAuthTokens();
     window.location.href = "/login";
   };
 
@@ -142,12 +150,12 @@ export default function AdminBooksPage() {
     }
 
     const newFiles = selectedImages
-      .filter(img => !img.isExisting && img.file)
-      .map(img => img.file as File);
-    
+      .filter((img) => !img.isExisting && img.file)
+      .map((img) => img.file as File);
+
     const keep_images = selectedImages
-      .filter(img => img.isExisting)
-      .map(img => {
+      .filter((img) => img.isExisting)
+      .map((img) => {
         const url = new URL(img.url);
         return url.pathname;
       });
@@ -161,7 +169,7 @@ export default function AdminBooksPage() {
           formData.stock,
           formData.price,
           newFiles,
-          keep_images
+          keep_images,
         );
       } else {
         await apiClient.createBook(
@@ -181,25 +189,25 @@ export default function AdminBooksPage() {
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
-    
+
     if (selectedImages.length + files.length > 4) {
       alert("Maximum 4 images allowed total");
       e.target.value = "";
       return;
     }
 
-    const newImages = files.map(file => ({
+    const newImages = files.map((file) => ({
       file,
       url: URL.createObjectURL(file),
-      isExisting: false
+      isExisting: false,
     }));
 
-    setSelectedImages(prev => [...prev, ...newImages]);
+    setSelectedImages((prev) => [...prev, ...newImages]);
     e.target.value = ""; // Clear input for next selection
   };
 
   const removeImage = (index: number) => {
-    setSelectedImages(prev => {
+    setSelectedImages((prev) => {
       const newImages = [...prev];
       if (!newImages[index].isExisting) {
         URL.revokeObjectURL(newImages[index].url);
@@ -217,12 +225,14 @@ export default function AdminBooksPage() {
       stock: book.stock,
       price: book.price,
     });
-    
+
     if (book.images && book.images.length > 0) {
-      setSelectedImages(book.images.map(img => ({
-        url: img.startsWith('http') ? img : `http://localhost:8000${img}`,
-        isExisting: true
-      })));
+      setSelectedImages(
+        book.images.map((img) => ({
+          url: img.startsWith("http") ? img : `http://localhost:8000${img}`,
+          isExisting: true,
+        })),
+      );
     } else {
       setSelectedImages([]);
     }
@@ -249,7 +259,7 @@ export default function AdminBooksPage() {
     setEditingBook(null);
     setFormData({ title: "", description: "", stock: 1, price: 0 });
     // Revoke blob URLs to prevent memory leaks
-    selectedImages.forEach(img => {
+    selectedImages.forEach((img) => {
       if (!img.isExisting) URL.revokeObjectURL(img.url);
     });
     setSelectedImages([]);
@@ -279,7 +289,8 @@ export default function AdminBooksPage() {
         isAdmin={isAdmin}
         onLogout={handleLogout}
         searchQuery={searchQuery}
-        onSearchChange={setSearchQuery} />
+        onSearchChange={setSearchQuery}
+      />
 
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
@@ -505,10 +516,13 @@ export default function AdminBooksPage() {
                     Required: 1-4
                   </span>
                 </div>
-                
+
                 <div className="grid grid-cols-2 gap-3">
                   {selectedImages.map((img, index) => (
-                    <div key={index} className="group relative aspect-[3/4] bg-[var(--beige)]/10 rounded-xl overflow-hidden border border-[var(--slate-200)] shadow-sm">
+                    <div
+                      key={index}
+                      className="group relative aspect-[3/4] bg-[var(--beige)]/10 rounded-xl overflow-hidden border border-[var(--slate-200)] shadow-sm"
+                    >
                       <img
                         src={img.url}
                         alt={`Preview ${index + 1}`}
@@ -525,12 +539,12 @@ export default function AdminBooksPage() {
                       </div>
                       <div className="absolute top-2 left-2 flex gap-1">
                         <span className="px-2 py-0.5 bg-white/90 text-[var(--navy)] text-[8px] font-black uppercase rounded shadow-sm">
-                          {img.isExisting ? 'Existing' : 'New'}
+                          {img.isExisting ? "Existing" : "New"}
                         </span>
                       </div>
                     </div>
                   ))}
-                  
+
                   {selectedImages.length < 4 && (
                     <label className="cursor-pointer group relative aspect-[3/4] border-2 border-dashed border-[var(--slate-200)] hover:border-[var(--navy)]/30 rounded-xl flex flex-col items-center justify-center gap-2 bg-[var(--beige)]/5 hover:bg-[var(--navy)]/5 transition-all">
                       <div className="p-3 bg-white rounded-full shadow-sm text-[var(--navy)]/50 group-hover:text-[var(--navy)] transition-colors">
@@ -549,9 +563,10 @@ export default function AdminBooksPage() {
                     </label>
                   )}
                 </div>
-                
+
                 <p className="text-[10px] text-[var(--charcoal)]/50 italic leading-relaxed">
-                  Tip: Drag and drop not supported yet. Select high-quality portrait images for best results.
+                  Tip: Drag and drop not supported yet. Select high-quality
+                  portrait images for best results.
                 </p>
               </div>
             </div>

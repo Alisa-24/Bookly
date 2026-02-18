@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { Eye, EyeOff, Loader } from "lucide-react";
-import { apiClient } from "@/lib/api";
+import { apiClient, setAuthTokens } from "@/lib/api";
 
 export function LoginForm() {
   const [email, setEmail] = useState("");
@@ -22,11 +22,11 @@ export function LoginForm() {
     try {
       const response = await apiClient.login(email, password);
       if (response.access_token) {
-        localStorage.setItem("auth_token", response.access_token);
-        
+        setAuthTokens(response.access_token, response.refresh_token);
+
         // Fetch user info to get role
         const user = await apiClient.getCurrentUser();
-        
+
         setSuccess("Login successful!");
         // Redirect to dashboard
         setTimeout(() => {

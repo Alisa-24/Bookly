@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { BookOpen, ShoppingCart, FilterX, Star } from "lucide-react";
 import Link from "next/link";
-import { apiClient } from "@/lib/api";
+import { apiClient, clearAuthTokens, getAccessToken } from "@/lib/api";
 import { cartApi } from "@/lib/api/cart";
 import SiteHeader from "@/components/SiteHeader";
 import Footer from "@/components/Footer";
@@ -35,7 +35,7 @@ export default function BooksPage() {
   const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
-    const token = localStorage.getItem("auth_token");
+    const token = getAccessToken();
     setIsLoggedIn(!!token);
     if (token) {
       checkUserRole();
@@ -110,7 +110,7 @@ export default function BooksPage() {
   };
 
   const handleLogout = () => {
-    localStorage.removeItem("auth_token");
+    clearAuthTokens();
     setIsLoggedIn(false);
     setIsAdmin(false);
     window.location.href = "/login";
@@ -398,7 +398,7 @@ export default function BooksPage() {
                                   "Session expired. Please login again.",
                                   "error",
                                 );
-                                localStorage.removeItem("auth_token");
+                                clearAuthTokens();
                                 setIsLoggedIn(false);
                                 return;
                               }

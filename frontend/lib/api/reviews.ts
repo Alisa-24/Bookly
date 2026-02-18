@@ -1,12 +1,4 @@
-const API_BASE_URL = "http://localhost:8000";
-
-const getHeaders = () => {
-  const token = typeof window !== "undefined" ? localStorage.getItem("auth_token") : null;
-  return {
-    "Content-Type": "application/json",
-    ...(token ? { Authorization: `Bearer ${token}` } : {}),
-  };
-};
+import { API_BASE_URL, fetchWithAuth, formatErrorMessage } from "../api";
 
 export interface Review {
   id: number;
@@ -27,14 +19,19 @@ export interface ReviewCreate {
 export const reviewsApi = {
   // Get reviews for a book
   async getBookReviews(bookId: number): Promise<Review[]> {
-    const response = await fetch(`${API_BASE_URL}/reviews/book/${bookId}`, {
-      method: "GET",
-      headers: getHeaders(),
-    });
+    const response = await fetchWithAuth(
+      `${API_BASE_URL}/reviews/book/${bookId}`,
+      {
+        method: "GET",
+      },
+      true,
+    );
 
     if (!response.ok) {
       const error = await response.json();
-      throw new Error(error.detail || "Failed to fetch reviews");
+      throw new Error(
+        formatErrorMessage(error.detail) || "Failed to fetch reviews",
+      );
     }
 
     return response.json();
@@ -42,15 +39,20 @@ export const reviewsApi = {
 
   // Create a review
   async createReview(data: ReviewCreate): Promise<Review> {
-    const response = await fetch(`${API_BASE_URL}/reviews/`, {
-      method: "POST",
-      headers: getHeaders(),
-      body: JSON.stringify(data),
-    });
+    const response = await fetchWithAuth(
+      `${API_BASE_URL}/reviews/`,
+      {
+        method: "POST",
+        body: JSON.stringify(data),
+      },
+      true,
+    );
 
     if (!response.ok) {
       const error = await response.json();
-      throw new Error(error.detail || "Failed to submit review");
+      throw new Error(
+        formatErrorMessage(error.detail) || "Failed to submit review",
+      );
     }
 
     return response.json();
@@ -58,14 +60,19 @@ export const reviewsApi = {
 
   // Delete a review
   async deleteReview(reviewId: number): Promise<void> {
-    const response = await fetch(`${API_BASE_URL}/reviews/${reviewId}`, {
-      method: "DELETE",
-      headers: getHeaders(),
-    });
+    const response = await fetchWithAuth(
+      `${API_BASE_URL}/reviews/${reviewId}`,
+      {
+        method: "DELETE",
+      },
+      true,
+    );
 
     if (!response.ok) {
       const error = await response.json();
-      throw new Error(error.detail || "Failed to delete review");
+      throw new Error(
+        formatErrorMessage(error.detail) || "Failed to delete review",
+      );
     }
   },
 };

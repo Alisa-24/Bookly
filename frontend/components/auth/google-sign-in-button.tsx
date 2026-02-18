@@ -3,7 +3,7 @@
 import { Chrome, Loader } from "lucide-react";
 import { useState, useEffect } from "react";
 import { ErrorModal } from "./error-modal";
-import { apiClient } from "@/lib/api";
+import { apiClient, setAuthTokens } from "@/lib/api";
 
 export function GoogleSignInButton() {
   const [isLoading, setIsLoading] = useState(false);
@@ -23,7 +23,7 @@ export function GoogleSignInButton() {
 
           // Store the token
           if (response.access_token) {
-            localStorage.setItem("auth_token", response.access_token);
+            setAuthTokens(response.access_token, response.refresh_token);
             console.log("Google auth successful");
             // Redirect to dashboard
             window.location.href = "/books";

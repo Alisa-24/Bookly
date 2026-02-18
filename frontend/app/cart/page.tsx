@@ -3,11 +3,12 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { cartApi, Cart } from "@/lib/api/cart";
-import { apiClient } from "@/lib/api";
+import { apiClient, clearAuthTokens, getAccessToken } from "@/lib/api";
 import { useRouter } from "next/navigation";
 import SiteHeader from "@/components/SiteHeader";
 import CheckoutButton from "@/components/CheckoutButton";
 import Footer from "@/components/Footer";
+import Toast from "@/components/Toast";
 
 export default function CartPage() {
   const [cart, setCart] = useState<Cart | null>(null);
@@ -15,6 +16,10 @@ export default function CartPage() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  const [toast, setToast] = useState<{
+    message: string;
+    type: "success" | "error";
+  } | null>(null);
   const router = useRouter();
 
   const buildImageSrc = (src: string) => {
@@ -35,13 +40,35 @@ export default function CartPage() {
   const total = subtotal + tax;
   const itemCount =
     cart?.items.reduce((sum, item) => sum + item.quantity, 0) || 0;
+
+  const showToast = (
+    message: string,
+    type: "success" | "error" = "success",
+  ) => {
+    setToast({ message, type });
+    setTimeout(() => setToast(null), 3000);
+  };
+
   useEffect(() => {
-    const token = localStorage.getItem("auth_token");
+    const token = getAccessToken();
     setIsLoggedIn(!!token);
     if (token) {
       checkUserRole();
     }
     fetchCart();
+
+    // Check for pending toasts from redirects
+    const pendingToast = localStorage.getItem("pending_toast");
+    if (pendingToast) {
+      try {
+        const { message, type } = JSON.parse(pendingToast);
+        showToast(message, type);
+      } catch (e) {
+        console.error("Failed to parse pending toast:", e);
+      } finally {
+        localStorage.removeItem("pending_toast");
+      }
+    }
   }, []);
 
   const checkUserRole = async () => {
@@ -63,7 +90,7 @@ export default function CartPage() {
         (error as { status?: number }).status === 401 ||
         (error as { status?: number }).status === 403
       ) {
-        router.push("/books")
+        router.push("/books");
       }
     } finally {
       setLoading(false);
@@ -102,7 +129,7 @@ export default function CartPage() {
   };
 
   const handleLogout = () => {
-    localStorage.removeItem("auth_token");
+    clearAuthTokens();
     setIsLoggedIn(false);
     setIsAdmin(false);
     window.location.href = "/login";
@@ -326,6 +353,7 @@ export default function CartPage() {
         </div>
       </main>
       <Footer />
+      {toast && <Toast message={toast.message} type={toast.type} />}
     </div>
   );
 }

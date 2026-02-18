@@ -1,8 +1,9 @@
 from fastapi import APIRouter, HTTPException, Depends, UploadFile, File, Form
-from sqlalchemy import select
+from sqlalchemy import select, func
 from sqlalchemy.orm import selectinload
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.models.book import Book
+from app.models.review import Review
 from app.schemas.book import BookRead
 from app.schemas.user import UserRead
 from app.db.session import get_async_session
@@ -17,13 +18,13 @@ router = APIRouter()
 
 @router.get("", response_model=list[BookRead])
 async def list_books(session: AsyncSession = Depends(get_async_session)):
-    result = await session.execute(select(Book).options(selectinload(Book.reviews)))
+    result = await session.execute(select(Book))
     books = result.scalars().all()
     return books
 
 @router.get("/{book_id}", response_model=BookRead)
 async def get_book(book_id: int, session: AsyncSession = Depends(get_async_session)):
-    query = select(Book).where(Book.id == book_id).options(selectinload(Book.reviews))
+    query = select(Book).where(Book.id == book_id)
     result = await session.execute(query)
     book = result.scalar_one_or_none()
     if not book:
@@ -94,6 +95,7 @@ async def create_book(
     session.add(new_book)
     await session.commit()
     await session.refresh(new_book)
+    
     return new_book
 
 @router.put("/{book_id}", response_model=BookRead)
@@ -168,11 +170,7 @@ async def update_book(
     session.add(existing_book)
     await session.commit()
     await session.refresh(existing_book)
-    return existing_book
     
-    session.add(existing_book)
-    await session.commit()
-    await session.refresh(existing_book)
     return existing_book
 
 @router.delete("/{book_id}")

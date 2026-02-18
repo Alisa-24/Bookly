@@ -1,6 +1,8 @@
 import uuid
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 
+import jwt
 from fastapi import Depends, Request
 from fastapi_users import BaseUserManager, FastAPIUsers, UUIDIDMixin
 from fastapi_users.authentication import (
@@ -11,7 +13,14 @@ from fastapi_users.authentication import (
 from fastapi_users.db import SQLAlchemyUserDatabase
 from httpx_oauth.clients.google import GoogleOAuth2
 
-from app.core.config import SECRET_KEY, GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET
+from app.core.config import (
+    ACCESS_TOKEN_EXPIRE_MINUTES,
+    REFRESH_TOKEN_EXPIRE_DAYS,
+    JWT_ALGORITHM,
+    SECRET_KEY,
+    GOOGLE_CLIENT_ID,
+    GOOGLE_CLIENT_SECRET,
+)
 from app.db.session import get_async_session
 from app.models.user import User
 
@@ -50,7 +59,32 @@ bearer_transport = BearerTransport(tokenUrl="auth/jwt/login")
 
 
 def get_jwt_strategy() -> JWTStrategy:
-    return JWTStrategy(secret=SECRET_KEY, lifetime_seconds=3600)
+    return JWTStrategy(
+        secret=SECRET_KEY,
+        lifetime_seconds=ACCESS_TOKEN_EXPIRE_MINUTES * 60,
+    )
+
+
+def create_refresh_token(user_id: uuid.UUID) -> str:
+    expires_at = datetime.now(timezone.utc) + timedelta(
+        days=REFRESH_TOKEN_EXPIRE_DAYS
+    )
+    payload = {
+        "sub": str(user_id),
+        "type": "refresh",
+        "exp": expires_at,
+    }
+    return jwt.encode(payload, SECRET_KEY, algorithm=JWT_ALGORITHM)
+
+
+def decode_refresh_token(token: str) -> str:
+    payload = jwt.decode(token, SECRET_KEY, algorithms=[JWT_ALGORITHM])
+    if payload.get("type") != "refresh":
+        raise jwt.InvalidTokenError("Invalid token type")
+    subject = payload.get("sub")
+    if not subject:
+        raise jwt.InvalidTokenError("Missing subject")
+    return str(subject)
 
 
 auth_backend = AuthenticationBackend(

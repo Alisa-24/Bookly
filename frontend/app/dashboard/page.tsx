@@ -6,7 +6,7 @@ import Link from "next/link";
 import SiteHeader from "@/components/SiteHeader";
 import { paymentAPI } from "@/lib/api/payment";
 import { cartApi } from "@/lib/api/cart";
-import { apiClient } from "@/lib/api";
+import { apiClient, clearAuthTokens, getAccessToken } from "@/lib/api";
 import Footer from "@/components/Footer";
 
 interface Order {
@@ -35,7 +35,7 @@ function DashboardContent() {
   const [cartCount, setCartCount] = useState(0);
 
   useEffect(() => {
-    const token = localStorage.getItem("auth_token");
+    const token = getAccessToken();
     setIsLoggedIn(!!token);
     if (token) {
       checkUserRole();
@@ -91,7 +91,7 @@ function DashboardContent() {
   };
 
   const handleLogout = () => {
-    localStorage.removeItem("auth_token");
+    clearAuthTokens();
     setIsLoggedIn(false);
     setIsAdmin(false);
     window.location.href = "/login";

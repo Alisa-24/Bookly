@@ -11,7 +11,7 @@ import {
   Star,
 } from "lucide-react";
 import Link from "next/link";
-import { apiClient } from "@/lib/api";
+import { apiClient, clearAuthTokens, getAccessToken } from "@/lib/api";
 import { cartApi } from "@/lib/api/cart";
 import { reviewsApi, Review } from "@/lib/api/reviews";
 import Toast from "@/components/Toast";
@@ -85,7 +85,7 @@ export default function BookDetailPage() {
     e.preventDefault();
     if (!book) return;
 
-    const token = localStorage.getItem("auth_token");
+    const token = getAccessToken();
     if (!token) {
       showToast("Please login to write a review", "error");
       return;
@@ -337,9 +337,12 @@ export default function BookDetailPage() {
               <button
                 onClick={async () => {
                   // Check login
-                  const token = localStorage.getItem("auth_token");
+                  const token = getAccessToken();
                   if (!token) {
-                    showToast("Please login to add items to your cart", "error");
+                    showToast(
+                      "Please login to add items to your cart",
+                      "error",
+                    );
                     return;
                   }
                   try {
@@ -350,8 +353,11 @@ export default function BookDetailPage() {
                       (err as { status?: number }).status === 401 ||
                       (err as { status?: number }).status === 403
                     ) {
-                      showToast("Session expired. Please login again.", "error");
-                      localStorage.removeItem("auth_token");
+                      showToast(
+                        "Session expired. Please login again.",
+                        "error",
+                      );
+                      clearAuthTokens();
                       return;
                     }
                     console.error(err);

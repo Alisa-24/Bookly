@@ -1,4 +1,6 @@
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, HTTPException, Depends, Request, status
+from fastapi.security import OAuth2PasswordRequestForm
+from fastapi_users.router.common import ErrorCode
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.security import (
     auth_backend,
@@ -6,11 +8,14 @@ from app.core.security import (
     google_oauth_client,
     get_user_manager,
     get_jwt_strategy,
+    create_refresh_token,
+    decode_refresh_token,
 )
 from app.schemas.user import UserRead, UserCreate, UserUpdate
 from app.core.config import SECRET_KEY
 from app.db.session import get_async_session
 from pydantic import BaseModel
+import json
 import httpx
 import uuid
 
@@ -21,7 +26,12 @@ class GoogleCallbackRequest(BaseModel):
 
 class TokenResponse(BaseModel):
     access_token: str
+    refresh_token: str
     token_type: str = "bearer"
+
+
+class RefreshTokenRequest(BaseModel):
+    refresh_token: str
 
 # Auth routes from routers.py
 router.include_router(
@@ -50,6 +60,40 @@ router.include_router(
     prefix="/google",
     tags=["auth"],
 )
+
+
+@router.post("/jwt/login-with-refresh", response_model=TokenResponse, tags=["auth"])
+async def login_with_refresh(
+    request: Request,
+    credentials: OAuth2PasswordRequestForm = Depends(),
+    user_manager = Depends(get_user_manager),
+    strategy = Depends(auth_backend.get_strategy),
+):
+    user = await user_manager.authenticate(credentials)
+
+    if user is None or not user.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=ErrorCode.LOGIN_BAD_CREDENTIALS,
+        )
+
+    response = await auth_backend.login(strategy, user)
+    await user_manager.on_after_login(user, request, response)
+
+    try:
+        payload = json.loads(response.body or b"{}")
+    except json.JSONDecodeError:
+        payload = {}
+
+    access_token = payload.get("access_token")
+    if not access_token:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to issue access token",
+        )
+
+    refresh_token = create_refresh_token(user.id)
+    return TokenResponse(access_token=access_token, refresh_token=refresh_token)
 
 @router.post("/google/callback", response_model=TokenResponse, tags=["auth"])
 async def google_oauth_callback(
@@ -122,8 +166,12 @@ async def google_oauth_callback(
         # Generate JWT token
         strategy = get_jwt_strategy()
         access_token = await strategy.write_token(user)
+        refresh_token = create_refresh_token(user.id)
         
-        return TokenResponse(access_token=access_token)
+        return TokenResponse(
+            access_token=access_token,
+            refresh_token=refresh_token,
+        )
         
     except Exception as e:
         import traceback
@@ -132,6 +180,34 @@ async def google_oauth_callback(
             status_code=400,
             detail=f"Google authentication failed: {str(e)}"
         )
+
+
+@router.post("/jwt/refresh", response_model=TokenResponse, tags=["auth"])
+async def refresh_access_token(
+    payload: RefreshTokenRequest,
+    user_manager = Depends(get_user_manager),
+):
+    try:
+        user_id = decode_refresh_token(payload.refresh_token)
+        user_uuid = uuid.UUID(user_id)
+    except Exception:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid refresh token",
+        )
+
+    user = await user_manager.user_db.get(user_uuid)
+    if not user or not user.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid refresh token",
+        )
+
+    strategy = get_jwt_strategy()
+    access_token = await strategy.write_token(user)
+    refresh_token = create_refresh_token(user.id)
+
+    return TokenResponse(access_token=access_token, refresh_token=refresh_token)
 
 # User management route
 router.include_router(

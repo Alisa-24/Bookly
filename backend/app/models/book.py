@@ -16,10 +16,4 @@ class Book(Base):
     price: Mapped[float] = mapped_column(Float, nullable=False)
     images: Mapped[List[str]] = mapped_column(JSON, default=list, nullable=False)
     
-    reviews: Mapped[list["Review"]] = relationship("Review", back_populates="book", cascade="all, delete-orphan")
-
-    @property
-    def average_rating(self) -> float:
-        if not self.reviews:
-            return 0.0
-        return sum(r.rating for r in self.reviews) / len(self.reviews)
+    reviews: Mapped[list["Review"]] = relationship("Review", back_populates="book", cascade="all, delete-orphan", lazy="noload")

@@ -1,4 +1,4 @@
-import { API_BASE_URL, getHeaders } from "../api";
+import { API_BASE_URL, fetchWithAuth, formatErrorMessage } from "../api";
 
 export interface Book {
   id: number;
@@ -30,23 +30,14 @@ async function request<T>(
   options: RequestInit = {},
 ): Promise<T> {
   const url = `${API_BASE_URL}${endpoint}`;
-  const headers = getHeaders(true) as HeadersInit; // Cart always requires auth for now
 
-  const config = {
-    ...options,
-    headers: {
-      ...headers,
-      ...options.headers,
-    },
-  };
-
-  const response = await fetch(url, config);
+  const response = await fetchWithAuth(url, options, true);
 
   if (!response.ok) {
     const error = await response
       .json()
       .catch(() => ({ detail: "Unknown error" }));
-    const message = error.detail || "API request failed";
+    const message = formatErrorMessage(error.detail);
     const apiError = new Error(message) as Error & { status?: number };
     apiError.status = response.status;
     throw apiError;

@@ -1,18 +1,154 @@
 export const API_BASE_URL = "http://localhost:8000";
 
+const AUTH_TOKEN_KEY = "auth_token";
+const REFRESH_TOKEN_KEY = "refresh_token";
+
+const getStoredToken = (key: string) => {
+  if (typeof window === "undefined") {
+    return null;
+  }
+
+  return localStorage.getItem(key);
+};
+
+export const getAccessToken = () => getStoredToken(AUTH_TOKEN_KEY);
+export const getRefreshToken = () => getStoredToken(REFRESH_TOKEN_KEY);
+
+export const setAuthTokens = (accessToken: string, refreshToken?: string) => {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  if (accessToken) {
+    localStorage.setItem(AUTH_TOKEN_KEY, accessToken);
+  }
+
+  if (refreshToken) {
+    localStorage.setItem(REFRESH_TOKEN_KEY, refreshToken);
+  }
+};
+
 export const getHeaders = (requireAuth = false) => {
   const headers: HeadersInit = {
     "Content-Type": "application/json",
   };
 
   if (requireAuth) {
-    const token = localStorage.getItem("auth_token");
+    const token = getAccessToken();
     if (token) {
       headers["Authorization"] = `Bearer ${token}`;
     }
   }
 
   return headers;
+};
+
+export const clearAuthTokens = () => {
+  if (typeof window !== "undefined") {
+    localStorage.removeItem(AUTH_TOKEN_KEY);
+    localStorage.removeItem(REFRESH_TOKEN_KEY);
+  }
+};
+
+export const formatErrorMessage = (detail: any): string => {
+  if (typeof detail === "string") {
+    return detail;
+  }
+  if (Array.isArray(detail)) {
+    return detail
+      .map((e: any) => e.msg || e.message || JSON.stringify(e))
+      .join(", ");
+  }
+  if (typeof detail === "object" && detail !== null) {
+    return JSON.stringify(detail);
+  }
+  return "Unknown error";
+};
+
+const mergeHeaders = (
+  headers: HeadersInit | undefined,
+  requireAuth: boolean,
+  isFormData: boolean = false,
+  hasBody: boolean = false,
+) => {
+  const merged = new Headers(headers);
+
+  // For FormData requests, don't set Content-Type and let the browser set it with boundary
+  if (isFormData) {
+    merged.delete("Content-Type");
+  } else if (hasBody && !merged.has("Content-Type")) {
+    // For non-FormData requests with a body, ensure Content-Type is application/json
+    merged.set("Content-Type", "application/json");
+  }
+
+  if (requireAuth) {
+    const token = getAccessToken();
+    if (token) {
+      merged.set("Authorization", `Bearer ${token}`);
+    }
+  }
+
+  return merged;
+};
+
+export const refreshAccessToken = async () => {
+  const refreshToken = getRefreshToken();
+  if (!refreshToken) {
+    return false;
+  }
+
+  const response = await fetch(`${API_BASE_URL}/auth/jwt/refresh`, {
+    method: "POST",
+    headers: getHeaders(),
+    body: JSON.stringify({ refresh_token: refreshToken }),
+  });
+
+  if (!response.ok) {
+    clearAuthTokens();
+    return false;
+  }
+
+  const data = await response.json();
+  if (data.access_token) {
+    setAuthTokens(data.access_token, data.refresh_token);
+    return true;
+  }
+
+  clearAuthTokens();
+  return false;
+};
+
+export const fetchWithAuth = async (
+  input: RequestInfo | URL,
+  init: RequestInit = {},
+  requireAuth = false,
+  retry = true,
+): Promise<Response> => {
+  const isFormData = init.body instanceof FormData;
+  const hasBody = init.body !== undefined && init.body !== null;
+
+  const config: RequestInit = {
+    ...init,
+    headers: mergeHeaders(init.headers, requireAuth, isFormData, hasBody),
+  };
+
+  const response = await fetch(input, config);
+
+  if (!requireAuth || response.status !== 401 || !retry) {
+    return response;
+  }
+
+  const refreshed = await refreshAccessToken();
+  if (!refreshed) {
+    return response;
+  }
+
+  const retryConfig: RequestInit = {
+    ...init,
+    headers: mergeHeaders(init.headers, requireAuth, isFormData, hasBody),
+  };
+
+  return fetch(input, retryConfig);
 };
 
 export const apiClient = {
@@ -22,21 +158,17 @@ export const apiClient = {
     formData.append("username", email);
     formData.append("password", password);
 
-    const response = await fetch(`${API_BASE_URL}/auth/jwt/login`, {
-      method: "POST",
-      body: formData,
-    });
+    const response = await fetch(
+      `${API_BASE_URL}/auth/jwt/login-with-refresh`,
+      {
+        method: "POST",
+        body: formData,
+      },
+    );
 
     if (!response.ok) {
       const error = await response.json();
-      // Handle both string and array error details
-      if (Array.isArray(error.detail)) {
-        const messages = error.detail
-          .map((e: any) => e.msg || e.message || JSON.stringify(e))
-          .join(", ");
-        throw new Error(messages || "Login failed");
-      }
-      throw new Error(error.detail || "Login failed");
+      throw new Error(formatErrorMessage(error.detail) || "Login failed");
     }
 
     return response.json();
@@ -55,14 +187,9 @@ export const apiClient = {
 
     if (!response.ok) {
       const error = await response.json();
-      // Handle both string and array error details
-      if (Array.isArray(error.detail)) {
-        const messages = error.detail
-          .map((e: any) => e.msg || e.message || JSON.stringify(e))
-          .join(", ");
-        throw new Error(messages || "Registration failed");
-      }
-      throw new Error(error.detail || "Registration failed");
+      throw new Error(
+        formatErrorMessage(error.detail) || "Registration failed",
+      );
     }
 
     return response.json();
@@ -77,31 +204,40 @@ export const apiClient = {
 
     if (!response.ok) {
       const error = await response.json();
-      throw new Error(error.detail || "Google authentication failed");
+      throw new Error(
+        formatErrorMessage(error.detail) || "Google authentication failed",
+      );
     }
 
     return response.json();
   },
 
   async logout() {
-    const response = await fetch(`${API_BASE_URL}/auth/logout`, {
-      method: "POST",
-      headers: getHeaders(true),
-    });
+    const response = await fetchWithAuth(
+      `${API_BASE_URL}/auth/logout`,
+      {
+        method: "POST",
+      },
+      true,
+      false,
+    );
 
     if (!response.ok) {
       throw new Error("Logout failed");
     }
 
-    localStorage.removeItem("auth_token");
+    clearAuthTokens();
     return response.json();
   },
 
   async getCurrentUser() {
-    const response = await fetch(`${API_BASE_URL}/users/me`, {
-      method: "GET",
-      headers: getHeaders(true),
-    });
+    const response = await fetchWithAuth(
+      `${API_BASE_URL}/users/me`,
+      {
+        method: "GET",
+      },
+      true,
+    );
 
     if (!response.ok) {
       throw new Error("Failed to fetch current user");
@@ -113,7 +249,6 @@ export const apiClient = {
   async getBooks() {
     const response = await fetch(`${API_BASE_URL}/books`, {
       method: "GET",
-      headers: getHeaders(),
     });
 
     if (!response.ok) {
@@ -126,7 +261,6 @@ export const apiClient = {
   async getBookById(id: number) {
     const response = await fetch(`${API_BASE_URL}/books/${id}`, {
       method: "GET",
-      headers: getHeaders(),
     });
 
     if (!response.ok) {
@@ -147,6 +281,9 @@ export const apiClient = {
       throw new Error("You must upload between 1 and 4 images");
     }
 
+    // Ensure token is fresh before upload
+    await refreshAccessToken();
+
     const formData = new FormData();
     formData.append("title", title);
     formData.append("description", description);
@@ -156,18 +293,21 @@ export const apiClient = {
       formData.append("images", image);
     });
 
-    const token = localStorage.getItem("auth_token");
-    const response = await fetch(`${API_BASE_URL}/books`, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${token}`,
+    const response = await fetchWithAuth(
+      `${API_BASE_URL}/books`,
+      {
+        method: "POST",
+        body: formData,
       },
-      body: formData,
-    });
+      true,
+      false,
+    );
 
     if (!response.ok) {
       const error = await response.json();
-      throw new Error(error.detail || "Failed to create book");
+      throw new Error(
+        formatErrorMessage(error.detail) || "Failed to create book",
+      );
     }
 
     return response.json();
@@ -187,43 +327,54 @@ export const apiClient = {
       throw new Error("Books must have between 1 and 4 images total");
     }
 
+    // Ensure token is fresh before upload
+    await refreshAccessToken();
+
     const formData = new FormData();
     formData.append("title", title);
     formData.append("description", description);
     formData.append("stock", stock.toString());
     formData.append("price", price.toString());
     formData.append("keep_images", JSON.stringify(keep_images));
-    
+
     images.forEach((image) => {
       formData.append("images", image);
     });
 
-    const token = localStorage.getItem("auth_token");
-    const response = await fetch(`${API_BASE_URL}/books/${id}`, {
-      method: "PUT",
-      headers: {
-        Authorization: `Bearer ${token}`,
+    const response = await fetchWithAuth(
+      `${API_BASE_URL}/books/${id}`,
+      {
+        method: "PUT",
+        body: formData,
       },
-      body: formData,
-    });
+      true,
+      false,
+    );
 
     if (!response.ok) {
       const error = await response.json();
-      throw new Error(error.detail || "Failed to update book");
+      throw new Error(
+        formatErrorMessage(error.detail) || "Failed to update book",
+      );
     }
 
     return response.json();
   },
 
   async deleteBook(id: number) {
-    const response = await fetch(`${API_BASE_URL}/books/${id}`, {
-      method: "DELETE",
-      headers: getHeaders(true),
-    });
+    const response = await fetchWithAuth(
+      `${API_BASE_URL}/books/${id}`,
+      {
+        method: "DELETE",
+      },
+      true,
+    );
 
     if (!response.ok) {
       const error = await response.json();
-      throw new Error(error.detail || "Failed to delete book");
+      throw new Error(
+        formatErrorMessage(error.detail) || "Failed to delete book",
+      );
     }
 
     return response.json();

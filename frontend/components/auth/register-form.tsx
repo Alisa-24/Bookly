@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { Eye, EyeOff, Loader } from "lucide-react";
-import { apiClient } from "@/lib/api";
+import { apiClient, setAuthTokens } from "@/lib/api";
 
 export function RegisterForm() {
   const [name, setName] = useState("");
@@ -35,7 +35,7 @@ export function RegisterForm() {
       // After successful registration, automatically log them in
       const loginResponse = await apiClient.login(email, password);
       if (loginResponse.access_token) {
-        localStorage.setItem("auth_token", loginResponse.access_token);
+        setAuthTokens(loginResponse.access_token, loginResponse.refresh_token);
         setSuccess("Account created and logged in!");
         // Redirect to dashboard
         setTimeout(() => {
